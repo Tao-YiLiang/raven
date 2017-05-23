@@ -2169,7 +2169,11 @@ class SciKitLearn(superVisedLearning):
     """
     returnDict = {}
     #get the number of inputs provided to this ROM to evaluate
-    numInputs = len(edict.values()[0])
+    try:
+      numInputs = len(edict.values()[0])
+    except TypeError:
+      #happens when evaluation model returns float instead of array
+      numInputs = 1
     #fill the target values
     for index,target in enumerate(self.target):
       returnDict[target] = np.ones(numInputs)*self.myNumber[index]

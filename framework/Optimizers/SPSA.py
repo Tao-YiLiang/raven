@@ -91,7 +91,7 @@ class SPSA(GradientBasedOptimizer):
       self.stochasticDistribution.initializeDistribution()
       # Initialize bernoulli distribution for random perturbation. Add artificial noise to avoid that specular loss functions get false positive convergence
       self.stochasticEngine = lambda: [1.0+(Distributions.random()/1000.0)*Distributions.randomIntegers(-1, 1, self) if self.stochasticDistribution.rvs() == 1 else
-                                      -1.0+(Distributions.random()/1000.0)*Distributions.randomIntegers(-1, 1, self) for _ in range(self.nVar)]
+                                      -1.0+(Distributions.random()/1000.0)*Distributions.randomIntegers(-1, 1, self) for _ in range(len(self.optVars))]
     else:
       self.raiseAnError(IOError, self.paramDict['stochasticEngine']+'is currently not supported for SPSA')
 
@@ -111,11 +111,13 @@ class SPSA(GradientBasedOptimizer):
       @ In, convergence, bool, optional, variable indicating whether the convergence criteria has been met.
       @ Out, ready, bool, variable indicating whether the caller is prepared for another input.
     """
+    print('DEBUGG checking local still ready ...')
     self.nextActionNeeded = (None,None) #prevents carrying over from previous run
     #get readiness from parent
     ready = ready and GradientBasedOptimizer.localStillReady(self,ready,convergence)
     #if not ready, just return that
     if not ready:
+      print('DEBUGG  ... was not ready before here.')
       return ready
     for _ in range(len(self.optTrajLive)):
       # despite several attempts, this is the most elegant solution I've found to assure each
@@ -125,11 +127,11 @@ class SPSA(GradientBasedOptimizer):
       #see if trajectory needs starting
       if self.counter['varsUpdate'][traj] not in self.optVarsHist[traj].keys():
         self.nextActionNeeded = ('start new trajectory',traj)
-        break #return True
+        break
       # see if there are points needed for evaluating a gradient, pick one
       elif self.counter['perturbation'][traj] < self.gradDict['pertNeeded']:
         self.nextActionNeeded = ('add new grad evaluation point',traj)
-        break #return True
+        break
       else:
         # since all evaluation points submitted, check if we have enough collected to evaluate a gradient
         evalNotFinish = False
@@ -139,16 +141,26 @@ class SPSA(GradientBasedOptimizer):
             break
         if not evalNotFinish:
           # enough evaluations are done to calculate this trajectory's gradient
-          #evaluate the gradient TODO don't actually evaluate it, until we get Andrea's branch merged in
+          # evaluate the gradient
+          self.evaluateGradient(traj)
+          gradient = self.counter['gradientHistory'][traj][0]
+          # check convergence
+          currentObjectiveValue = self.latestOptPoint[traj]['output']
+          self._updateConvergenceVector(traj, self.counter['solutionUpdate'][traj]-1,self.latestOptPoint[traj]['output']) #FIXME -1 correct?
+          # if this trajectory is converged, we're not ready
+          if self.convergeTraj[traj]:
+            continue #try a different trajectory; this one is done!
+          else:
+            ready = True
           self.nextActionNeeded = ('evaluate gradient',traj)
-          break #return True
+          break
     # if we did not find an action, we're not ready to provide an input
     if self.nextActionNeeded[0] is None:
       self.raiseADebug('Not ready to provide a sample yet.')
       return False
     else:
       self.raiseADebug('Next action needed: "%s" on trajectory "%i"' %self.nextActionNeeded)
-      return True
+      return ready
 
   def _checkBoundariesAndModify(self,upperBound,lowerBound,varRange,currentValue,pertUp,pertLow):
     """
@@ -168,6 +180,20 @@ class SPSA(GradientBasedOptimizer):
       convertedValue = pertLow*varRange + lowerBound
     return convertedValue
 
+  def clearCurrentOptimizationEffort(self,traj):
+    """
+      See base class.  Used to clear out current optimization information and start clean.
+      For the SPSA, this means clearing out the perturbation points
+      @ In, traj, int, index of trajectory being cleared
+      @ Out, None
+    """
+    self.raiseADebug('Clearing current optimization efforts ...')
+    self.counter ['perturbation'   ][traj] = 0
+    self.counter ['gradientHistory'][traj] = [{},{}]
+    self.counter ['gradNormHistory'][traj] = [{},{}]
+    self.gradDict['pertPoints'     ][traj] = []
+    self.convergeTraj               [traj] = False
+
   def localGenerateInput(self,model,oldInput):
     """
       Method to generate input for model to run
@@ -175,6 +201,7 @@ class SPSA(GradientBasedOptimizer):
       @ In, oldInput, list, a list of the original needed inputs for the model (e.g. list of files, etc. etc)
       @ Out, None
     """
+    print('DEBUGG localGenerateInput')
     GradientBasedOptimizer.localGenerateInput(self,model,oldInput)
     action, traj = self.nextActionNeeded
     #"action" and "traj" are set in localStillReady
@@ -227,7 +254,6 @@ class SPSA(GradientBasedOptimizer):
                 self.raiseAnError(RuntimeError,'In choosing gradient evaluation points, the same point was chosen twice for variable "%s"!' %var)
               self.gradDict['pertPoints'][traj][ind][var] = np.concatenate((p1, p2))
 
-
       # get one of the perturbations to run
       loc1 = self.counter['perturbation'][traj] % 2
       loc2 = np.floor(self.counter['perturbation'][traj] / 2) if loc1 == 1 else np.floor(self.counter['perturbation'][traj] / 2) - 1
@@ -244,31 +270,46 @@ class SPSA(GradientBasedOptimizer):
       # evaluation completed for gradient evaluation
       self.counter['perturbation'][traj] = 0
       self.counter['varsUpdate'][traj] += 1
-      gradient = self.evaluateGradient(self.gradDict['pertPoints'][traj], traj)
-      ak = self._computeGainSequenceAk(self.paramDict,self.counter['varsUpdate'][traj],traj) # Compute the new ak
+      gradient = self.counter['gradientHistory'][traj][0]
       self.optVarsHist[traj][self.counter['varsUpdate'][traj]] = {}
       varK = copy.deepcopy(self.optVarsHist[traj][self.counter['varsUpdate'][traj]-1])
+      ak = self._computeGainSequenceAk(self.paramDict,self.counter['varsUpdate'][traj],traj) # Compute the new ak
       # FIXME here is where adjustments to the step size should happen
       #TODO this is part of a future request.  Commented for now.
       #get central response for this trajectory: how?? TODO FIXME
       #centralResponseIndex = self._checkModelFinish(traj,self.counter['varsUpdate'][traj]-1,'v')[1]
       #self.estimateStochasticity(gradient,self.gradDict['pertPoints'][traj][self.counter['varsUpdate'][traj]-1],varK,centralResponseIndex) #TODO need current point too!
+
+      # get the new optimal point, given constraints
       varKPlus = self._generateVarsUpdateConstrained(ak,gradient,varK)
+      # denormalize the new optimal point so the right values get run
       varKPlusDenorm = self.denormalizeData(varKPlus)
+      print('DEBUGG ... moving opt point to',varKPlusDenorm)
+      # fill sample dictionary
       for var in self.optVars:
         self.values[var] = copy.deepcopy(varKPlusDenorm[var])
-        self.optVarsHist[traj][self.counter['varsUpdate'][traj]][var] = copy.deepcopy(varKPlus[var])
+        #self.optVarsHist[traj][self.counter['varsUpdate'][traj]][var] = copy.deepcopy(varKPlus[var])
+      self.updateVariableHistory(self.values,traj)
       # use 'prefix' to locate the input sent out. The format is: trajID + iterID + (v for variable update; otherwise id for gradient evaluation) + global ID
-      #again, this is a copied line of code, so we should extract it if possible
+      # again, this is a copied line of code, so we should extract it if possible
       self.inputInfo['prefix'] = self._createEvaluationIdentifier(traj,self.counter['varsUpdate'][traj],'v')
 
-      # remove redundant trajectory
+      # remove redundant trajectory; those that are following a path already trod
       if len(self.optTrajLive) > 1 and self.counter['solutionUpdate'][traj] > 0:
         self._removeRedundantTraj(traj, self.optVarsHist[traj][self.counter['varsUpdate'][traj]])
 
-    #unrecognized action
+    #unrecognized action; we shouldn't hit this point
     else:
       self.raiseAnError(RuntimeError,'Unrecognized "action" in localGenerateInput:',action)
+
+  def evaluateGradient(self,traj):
+    """
+      Specialization of gradient evaluation.  Calls the base class, and sets the gradient in global variables.
+      @ In, traj, int, trajectory whose gradient we are evaluating
+      @ Out, None
+    """
+    print('DEBUGG SPSA evalGrad pertPoints:',self.gradDict['pertPoints'][traj])
+    _ = GradientBasedOptimizer.evaluateGradient(self,self.gradDict['pertPoints'][traj],traj)
 
   def estimateStochasticity(self,gradient,perturbedPoints,centralPoint,centralResponseIndex):
     """
@@ -477,7 +518,10 @@ class SPSA(GradientBasedOptimizer):
     ak = a / (iterNum + A) ** alpha
     # the line search with surrogate unfortunately does not work very well (we use it just at the begin of the search and after that
     # we switch to a decay constant strategy (above)). Another strategy needs to be find.
-    if iterNum > 1 and iterNum <= int(self.limit['mdlEval']/50.0):
+    # TODO FIXME don't use iterNum > 1!  Use something else that the multilevel can tweak, like checking if the old grad eval is an empty dict.
+    #if iterNum > 1 and iterNum <= int(self.limit['mdlEval']/50.0): #what's with 50.?
+    if len(self.counter['gradientHistory'][traj][1]) > 0 and iterNum <= int(self.limit['mdlEval']/50.0): #what's with 50.?
+      print('DEBUGG ... using line search to compute gain sequence ...')
       # we use a line search algorithm for finding the best learning rate (using a surrogate)
       # if it fails, we use a decay rate (ak = a / (iterNum + A) ** alpha)
       objEvaluateROM = SupervisedLearning.returnInstance('SciKitLearn', self, **{'SKLtype':'neighbors|KNeighborsRegressor', 'Features':','.join(list(self.optVars)), 'Target':self.objVar, 'n_neighbors':5,'weights':'distance'})
@@ -506,11 +550,11 @@ class SPSA(GradientBasedOptimizer):
         """
         return scipy.optimize.approx_fprime(x, f, self._computeGainSequenceCk(self.paramDict,self.counter['varsUpdate'][traj]+1))
 
-      xK             = np.asarray([self.optVarsHist[traj][iterNum-1][key] for key in self.optVars])
-      xKPrevious     = np.asarray([self.optVarsHist[traj][iterNum-2][key] for key in self.optVars])
+      xK = np.asarray([self.optVarsHist[traj][iterNum-1][key] for key in self.optVars])
+      xKPrevious = np.asarray([self.optVarsHist[traj][iterNum-2][key] for key in self.optVars])
       #xK             = np.asarray([self.denormalizeData(self.optVarsHist[traj][iterNum-1])[key] for key in self.optVars])
       #xKPrevious     = np.asarray([self.denormalizeData(self.optVarsHist[traj][iterNum-2])[key] for key in self.optVars])
-      gradxK         = np.asarray([self.counter['gradientHistory'][traj][0][key] for key in self.optVars])#/self.counter['gradNormHistory'][traj][0]
+      gradxK = np.asarray([self.counter['gradientHistory'][traj][0][key] for key in self.optVars])#/self.counter['gradNormHistory'][traj][0]
       gradxKPrevious = np.asarray([self.counter['gradientHistory'][traj][1][key] for key in self.optVars])#/self.counter['gradNormHistory'][traj][1]
       alphaLineSearchCurrent  = scipy.optimize.line_search(f, fprime, xK, gradxK, amax=10.0)
       alphaLineSearchPrevious = scipy.optimize.line_search(f, fprime, xKPrevious, gradxKPrevious, amax=10.0)
@@ -520,7 +564,7 @@ class SPSA(GradientBasedOptimizer):
       if alphaLineSearchPrevious[-1] is not None:
         akPrevious = min(float(alphaLineSearchPrevious[0]),a)
       newAk = (akCurrent+akPrevious)/2.
-      print(ak,newAk)
+      print('DEBUGG gain,new gain:',ak,newAk)
       if newAk != 0.0:
         ak = newAk
     return ak

@@ -1,0 +1,114 @@
+<?xml version="1.0" ?>
+<Simulation verbosity="debug">
+  <!-- Test info -->
+  <TestInfo>
+    <name>framework/Optimizers/multilevelRosenbrock</name>
+    <author>talbpaul</author>
+    <created>2017-05-09</created>
+    <classesTested>Optimizer</classesTested>
+    <description>
+      This test runs the multilevel optimization on Rosenbrock's function.  It tests analytic optimization values
+      as well as the mechanical operation of the test.
+    </description>
+  </TestInfo>
+
+  <!-- actual RAVEN input -->
+  <RunInfo>
+    <WorkingDir>RosenbrockMultilevel</WorkingDir>
+    <Sequence>optimize,print</Sequence>
+    <batchSize>1</batchSize>
+  </RunInfo>
+
+  <Steps>
+    <MultiRun name="optimize">
+      <Input class="DataObjects" type="PointSet">dummyIN</Input>
+      <Model class="Models" type="ExternalModel">rosenbrock</Model>
+      <Optimizer class="Optimizers" type="SPSA">opter</Optimizer>
+      <SolutionExport class="DataObjects" type="HistorySet">opt_export</SolutionExport>
+      <Output class="DataObjects" type="PointSet">optOut</Output>
+    </MultiRun>
+    <IOStep name="print" pauseAtEnd="True">
+      <Input class="DataObjects" type="PointSet">optOut</Input>
+      <Input class="DataObjects" type="HistorySet">opt_export</Input>
+      <Output class="OutStreams" type="Print">opt_dump</Output>
+      <Output class="OutStreams" type="Print">opt_export</Output>
+    </IOStep>
+  </Steps>
+
+  <Optimizers>
+    <SPSA name="opter">
+      <initialization>
+        <limit>2000</limit>
+        <initialSeed>42</initialSeed>
+      </initialization>
+      <TargetEvaluation class="DataObjects" type="PointSet">optOut</TargetEvaluation>
+      <convergence>
+          <relativeThreshold>1e-15</relativeThreshold>
+      </convergence>
+      <variable name='x'>
+        <upperBound>10</upperBound>
+        <lowerBound>-10</lowerBound>
+      </variable>
+      <variable name='y'>
+        <upperBound>10</upperBound>
+        <lowerBound>-10</lowerBound>
+      </variable>
+      <variable name='z'>
+        <upperBound>10</upperBound>
+        <lowerBound>-10</lowerBound>
+      </variable>
+      <variable name='a'>
+        <upperBound>10</upperBound>
+        <lowerBound>-10</lowerBound>
+      </variable>
+      <variable name='b'>
+        <upperBound>10</upperBound>
+        <lowerBound>-10</lowerBound>
+      </variable>
+      <variable name='c'>
+        <upperBound>10</upperBound>
+        <lowerBound>-10</lowerBound>
+      </variable>
+      <objectVar>ans</objectVar>
+      <multilevel>
+        <subspace name='alpha'>x,y,z</subspace>
+        <subspace name='beta'>a,b,c</subspace>
+        <sequence>alpha,beta</sequence>
+      </multilevel>
+    </SPSA>
+  </Optimizers>
+
+  <Models>
+    <Dummy name="MyDummy" subType=""/>
+    <ExternalModel ModuleToLoad="../../../framework/AnalyticModels/optimizing/rosenbrock" name="rosenbrock" subType="">
+      <variables>a,b,c,x,y,z,ans</variables>
+    </ExternalModel>
+  </Models>
+
+  <DataObjects>
+    <PointSet name="dummyIN">
+      <Input>a,b,c,x,y,z</Input>
+      <Output>OutputPlaceHolder</Output>
+    </PointSet>
+    <PointSet name="optOut">
+      <Input>a,b,c,x,y,z</Input>
+      <Output>ans</Output>
+    </PointSet>
+    <HistorySet name="opt_export">
+      <Input>trajID</Input>
+      <Output>a,b,c,x,y,z,ans,varsUpdate</Output>
+    </HistorySet>
+  </DataObjects>
+
+  <OutStreams>
+    <Print name="opt_dump">
+      <type>csv</type>
+      <source>optOut</source>
+    </Print>
+    <Print name="opt_export">
+      <type>csv</type>
+      <source>opt_export</source>
+    </Print>
+  </OutStreams>
+
+</Simulation>
