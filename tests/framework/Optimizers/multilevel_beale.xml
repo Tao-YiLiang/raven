@@ -56,11 +56,14 @@
         <lowerBound>-4.5</lowerBound>
       </variable>
       <objectVar>ans</objectVar>
-      <!--multilevel>
+      <parameter>
+        <c>1e-9</c>
+      </parameter>
+      <multilevel>
         <subspace name='first'>x</subspace>
         <subspace name='second'>y</subspace>
         <sequence>first,second</sequence>
-      </multilevel-->
+      </multilevel>
     </SPSA>
   </Optimizers>
 

@@ -104,17 +104,16 @@ class SPSA(GradientBasedOptimizer):
     self.gradDict['pertNeeded'] = self.gradDict['numIterForAve'] * 2
     self._endJobRunnable        = (self._endJobRunnable*self.gradDict['pertNeeded'])+len(self.optTraj)
 
-  def localStillReady(self, ready, convergence = False):
+  def localStillReady(self, ready):#, convergence = False):
     """
       Determines if optimizer is ready to provide another input.  If not, and if jobHandler is finished, this will end sampling.
       @ In, ready, bool, variable indicating whether the caller is prepared for another input.
-      @ In, convergence, bool, optional, variable indicating whether the convergence criteria has been met.
       @ Out, ready, bool, variable indicating whether the caller is prepared for another input.
     """
     print('DEBUGG checking local still ready ...')
     self.nextActionNeeded = (None,None) #prevents carrying over from previous run
     #get readiness from parent
-    ready = ready and GradientBasedOptimizer.localStillReady(self,ready,convergence)
+    ready = ready and GradientBasedOptimizer.localStillReady(self,ready)#,convergence)
     #if not ready, just return that
     if not ready:
       print('DEBUGG  ... was not ready before here.')
@@ -124,6 +123,7 @@ class SPSA(GradientBasedOptimizer):
       #   trajectory gets even treatment.
       traj = self.optTrajLive.pop(0)
       self.optTrajLive.append(traj)
+      print('DEBUGG lsr pert pts:',self.counter['perturbation'][traj],'/',self.gradDict['pertNeeded'])
       #see if trajectory needs starting
       if self.counter['varsUpdate'][traj] not in self.optVarsHist[traj].keys():
         self.nextActionNeeded = ('start new trajectory',traj)
@@ -136,10 +136,13 @@ class SPSA(GradientBasedOptimizer):
         # since all evaluation points submitted, check if we have enough collected to evaluate a gradient
         evalNotFinish = False
         for pertID in range(1,self.gradDict['pertNeeded']+1):
+          # TODO FIXME this is giving false positives for multilevel!  Check something better?
           if not self._checkModelFinish(traj,self.counter['varsUpdate'][traj],pertID)[0]:#[0]:
+            print('DEBUGG not enough evals finished for gradient')
             evalNotFinish = True
             break
         if not evalNotFinish:
+          print('DEBUGG enough evals finished for gradient')
           # enough evaluations are done to calculate this trajectory's gradient
           # evaluate the gradient
           self.evaluateGradient(traj)
@@ -148,7 +151,9 @@ class SPSA(GradientBasedOptimizer):
           currentObjectiveValue = self.latestOptPoint[traj]['output']
           self._updateConvergenceVector(traj, self.counter['solutionUpdate'][traj]-1,self.latestOptPoint[traj]['output']) #FIXME -1 correct?
           # if this trajectory is converged, we're not ready
+          print('DEBUGG converged?',self.convergeTraj[traj])
           if self.convergeTraj[traj]:
+            print('DEBUGG converged, and ready is',ready)
             continue #try a different trajectory; this one is done!
           else:
             ready = True
@@ -191,6 +196,7 @@ class SPSA(GradientBasedOptimizer):
     self.counter ['perturbation'   ][traj] = 0
     self.counter ['gradientHistory'][traj] = [{},{}]
     self.counter ['gradNormHistory'][traj] = [{},{}]
+    self.counter ['varsUpdate'     ][traj] += 1 #I don't like doing this, but only way to assure a new point is considered
     self.gradDict['pertPoints'     ][traj] = []
     self.convergeTraj               [traj] = False
 
@@ -209,6 +215,7 @@ class SPSA(GradientBasedOptimizer):
     #"traj" is the trajectory that is in need of the action
 
     if action == 'start new trajectory':
+      print('DEBUGG LGI starting new trajectory')
       self.optVarsHist[traj][self.counter['varsUpdate'][traj]] = {}
       for var in self.optVars:
         self.values[var] = self.optVarsInit['initial'][var][traj]
@@ -222,6 +229,7 @@ class SPSA(GradientBasedOptimizer):
       self.inputInfo['prefix'] = self._createEvaluationIdentifier(traj,self.counter['varsUpdate'][traj],'v')
 
     elif action == 'add new grad evaluation point':
+      print('DEBUGG LGI adding eval point')
       self.counter['perturbation'][traj] += 1
       if self.counter['perturbation'][traj] == 1:
         # Generate all the perturbations at once, then we can submit them one at a time
@@ -267,6 +275,7 @@ class SPSA(GradientBasedOptimizer):
       self.inputInfo['prefix'] = self._createEvaluationIdentifier(traj,self.counter['varsUpdate'][traj],self.counter['perturbation'][traj])
 
     elif action == 'evaluate gradient':
+      print('DEBUGG LGI evaluating the gradient')
       # evaluation completed for gradient evaluation
       self.counter['perturbation'][traj] = 0
       self.counter['varsUpdate'][traj] += 1
@@ -300,6 +309,7 @@ class SPSA(GradientBasedOptimizer):
 
     #unrecognized action; we shouldn't hit this point
     else:
+      import time; time.sleep(5)
       self.raiseAnError(RuntimeError,'Unrecognized "action" in localGenerateInput:',action)
 
   def evaluateGradient(self,traj):
@@ -515,12 +525,14 @@ class SPSA(GradientBasedOptimizer):
       @ Out, ak, float, current value for gain ak
     """
     a, A, alpha = paramDict['a'], paramDict['A'], paramDict['alpha']
-    ak = a / (iterNum + A) ** alpha
+    ak = a / (10.*iterNum + A) ** alpha
+    #return ak
     # the line search with surrogate unfortunately does not work very well (we use it just at the begin of the search and after that
     # we switch to a decay constant strategy (above)). Another strategy needs to be find.
     # TODO FIXME don't use iterNum > 1!  Use something else that the multilevel can tweak, like checking if the old grad eval is an empty dict.
     #if iterNum > 1 and iterNum <= int(self.limit['mdlEval']/50.0): #what's with 50.?
-    if len(self.counter['gradientHistory'][traj][1]) > 0 and iterNum <= int(self.limit['mdlEval']/50.0): #what's with 50.?
+    # TODO this doesn't probably do what's expected for multilevel
+    if False:#len(self.counter['gradientHistory'][traj][1]) > 0 and iterNum <= int(self.limit['mdlEval']/50.0): #what's with 50.?
       print('DEBUGG ... using line search to compute gain sequence ...')
       # we use a line search algorithm for finding the best learning rate (using a surrogate)
       # if it fails, we use a decay rate (ak = a / (iterNum + A) ** alpha)
@@ -567,4 +579,5 @@ class SPSA(GradientBasedOptimizer):
       print('DEBUGG gain,new gain:',ak,newAk)
       if newAk != 0.0:
         ak = newAk
+    print('DEBUGG step gain size for iternum {}: {}'.format(iterNum,ak))
     return ak

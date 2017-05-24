@@ -121,11 +121,10 @@ class GradientBasedOptimizer(Optimizer):
     """
     pass
 
-  def localStillReady(self,ready, convergence = False): #,lastOutput=None
+  def localStillReady(self,ready): #,lastOutput=None
     """
       Determines if optimizer is ready to provide another input.  If not, and if jobHandler is finished, this will end sampling.
       @ In, ready, bool, variable indicating whether the caller is prepared for another input.
-      @ In, convergence, bool, optional, variable indicating whether the convergence criteria has been met.
       @ Out, ready, bool, boolean variable indicating whether the caller is prepared for another input.
     """
     #let this be handled at the local subclass level for now
@@ -143,10 +142,12 @@ class GradientBasedOptimizer(Optimizer):
     if self.mdlEvalHist.isItEmpty():
       return (False,-1)
 
+    #print('DEBUGG looking for prefix',traj,updateKey,evalID)
     prefix = self.mdlEvalHist.getMetadata('prefix')
     for index, pr in enumerate(prefix):
       pr = pr.split(utils.returnIdSeparator())[-1].split('_')
       # use 'prefix' to locate the input sent out. The format is: trajID + iterID + (v for variable update; otherwise id for gradient evaluation) + global ID
+      #print('DEBUGG located prefix',pr)
       if pr[0] == str(traj) and pr[1] == str(updateKey) and pr[2] == str(evalID):
         return (True, index)
     return (False, -1)
@@ -188,18 +189,18 @@ class GradientBasedOptimizer(Optimizer):
     gradient = {}
     for var in self.optVars:
       gradient[var] = gradArray[var].mean()
-    print('DEBUGG gradient 1:',gradient)
     gradient = self.localEvaluateGradient(optVarsValues, gradient)
-    print('DEBUGG gradient 2:',gradient)
     gradientNorm =  np.linalg.norm(gradient.values())
     if gradientNorm > 0.0:
       for var in gradient.keys():
         gradient[var] = gradient[var]/gradientNorm
-    print('DEBUGG gradient N:',gradientNorm)
-    self.counter['gradientHistory'][traj][1] = self.counter['gradientHistory'][traj][0]
+    print('DEBUGG gradient norm:',gradientNorm)
+    self.counter['gradientHistory'][traj][1] = copy.deepcopy(self.counter['gradientHistory'][traj][0])
     self.counter['gradientHistory'][traj][0] = gradient
-    self.counter['gradNormHistory'][traj][1] = self.counter['gradNormHistory'][traj][0]
+    self.counter['gradNormHistory'][traj][1] = copy.deepcopy(self.counter['gradNormHistory'][traj][0])
     self.counter['gradNormHistory'][traj][0] = gradientNorm
+    print('DEBUGG old gradient:',self.counter['gradientHistory'][traj][1])
+    print('DEBUGG new gradient:',self.counter['gradientHistory'][traj][0])
     return gradient
 
   def _createEvaluationIdentifier(self,trajID,iterID,evalType):
@@ -279,6 +280,7 @@ class GradientBasedOptimizer(Optimizer):
         self.raiseAMessage("Variables :" +str(varK))
 
         if sameCoordinateCheck or gradientNormCheck or absoluteTolCheck or relativeTolCheck:
+          print('DEBUGG trajectory converged:',traj)
           if sameCoordinateCheck:
             reason="same-coordinate"
           if gradientNormCheck:
@@ -295,6 +297,8 @@ class GradientBasedOptimizer(Optimizer):
           #  if tr == traj:
           #    self.optTrajLive.pop(trajInd)
           #    break
+        else:
+          print('DEBUGG trajectory NOT converged:',traj)
 
   def _removeRedundantTraj(self, trajToRemove, currentInput):
     """

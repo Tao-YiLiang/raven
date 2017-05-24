@@ -491,11 +491,12 @@ class Optimizer(utils.metaclass_insert(abc.ABCMeta,BaseType),Assembler):
     #clear "next action needed" to prevent false signals
     self.nextActionNeeded = (None,None)
     ready = True if self.counter['mdlEval'] < self.limit['mdlEval'] else False
+    ready = self.localStillReady(ready)#, convergence)
     convergence = self.checkConvergence()
-    ready = self.localStillReady(ready, convergence)
     print('DEBUGG ... ready and converged:',ready,convergence)
     #if converged and not ready, the optimizer believes it is done; check multilevel
     if self.multilevel:
+      print('DEBUGG ------------ MULTILEVEL CHECK ---------------')
       traj = 0 #FIXME for multiple trajectories
       # make sure we have optimization history points; otherwise, there's nothing to be done
       if len(self.optVarsHist[traj])>0:
@@ -504,6 +505,7 @@ class Optimizer(utils.metaclass_insert(abc.ABCMeta,BaseType),Assembler):
         # is this the first optimization point we've received?
         if self.mlDepth is None:
           # if so, then initialize multilevel
+          print('DEBUGG ... first opt point')
           self.updateMultilevelDepth(traj, len(self.mlSequence)-1, latest_point, setAll=True)
           # now we need to optimize the innermost space, so we are ready to provide samples
           return True
@@ -511,13 +513,17 @@ class Optimizer(utils.metaclass_insert(abc.ABCMeta,BaseType),Assembler):
         currentBatch = self.mlSequence[self.mlDepth]
         # are we in the innermost loop?
         if self.mlDepth == len(self.mlSequence)-1:
+          print('DEBUGG ... in innermost loop ...')
           # then, are we converged?
           if convergence:
+            print('DEBUGG ... converged ...')
             # then, move out one subspace in our loop
             self.updateMultilevelDepth(traj,self.mlDepth-1,latest_point)
+            ready = True #FIXME needed? --> yes, because "ready" is false, but we know that we just changed levels and need to keep the sampling going
           # else if not converged ...
           else:
             # ... then we're ready to perturb (or wait for the return of) the active (innermost) space
+            print('DEBUGG ... not converged ...')
             return ready
         # else if we're not in the innermost space ...
         else:
@@ -529,12 +535,12 @@ class Optimizer(utils.metaclass_insert(abc.ABCMeta,BaseType),Assembler):
               if convergence:
                 # we're done!
                 self.raiseADebug('Outermost subspace converged!')
-                return ready
+                return False #ready
               # else if not converged ...
               else:
                 # set the active space to be the innermost loop so it can converge for the new outer loop value
                 self.updateMultilevelDepth(traj,len(self.mlSequence)-1,latest_point)
-                return True
+                #return True
             # else if not in the outermost loop ...
             else:
               # set the active space to the innermost loop so it can converge for the outer loop value
@@ -545,6 +551,8 @@ class Optimizer(utils.metaclass_insert(abc.ABCMeta,BaseType),Assembler):
             # allow the current subspace to be perturbed
             self.raiseADebug('Perturbing subspace "{}" ...'.format(currentBatch))
             return ready
+    ready = self.localStillReady(ready)
+    print('DEBUGG amiready returning',ready)
     return ready
 
   def updateMultilevelDepth(self, traj, depth, optPoint, setAll=False):
@@ -811,6 +819,7 @@ class Optimizer(utils.metaclass_insert(abc.ABCMeta,BaseType),Assembler):
       @ In, model, model instance, it is the instance of a RAVEN model
       @ In, myInput, list, the generating input
     """
+    print('DEBUGG finalizing sampling optimizer')
     ## Update the solution export
     # obtain solutions by ID; the subclass has to know how to do this
     if self.solutionExport != None and len(self.mdlEvalHist) > 0:
