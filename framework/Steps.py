@@ -515,9 +515,12 @@ class MultiRun(SingleRun):
                                         ' Use a RomTrainer step to train it.')
     # run step loop
     while True:
+      print('\nDEBUGG looping step\n')
       # collect finished jobs
+      print('DEBUGG ... getting finished jobs ...')
       finishedJobs = jobHandler.getFinished()
       for finishedJob in finishedJobs:
+        print('DEBUGG ... collecting job')
         # update number of collected runs
         self.counter +=1
         # collect run if it succeeded
@@ -540,10 +543,13 @@ class MultiRun(SingleRun):
         ## employ a threshold on the number of jobs the jobHandler can take,
         ## in addition, we cannot provide more jobs than the sampler can provide.
         ## So, we take the minimum of these two values.
-        for _ in range(min(jobHandler.availability(),sampler.endJobRunnable())):
+        availableJobs = min(jobHandler.availability(),sampler.endJobRunnable())
+        print('DEBUGG ----------------------- FILLING NEW JOBS: {} --------------------------'.format(availableJobs))
+        for _ in range(availableJobs):
           self.raiseADebug('Testing the sampler if it is ready to generate a new input')
 
           if sampler.amIreadyToProvideAnInput():
+            print('DEBUGG step, sampler is ready to provide input')
             try:
               newInput = self._findANewInputToRun(sampler, model, inputs, outputs)
               model.submit(newInput, inDictionary[self.samplerType].type, jobHandler, **copy.deepcopy(sampler.inputInfo))
@@ -554,6 +560,7 @@ class MultiRun(SingleRun):
             break
       ## If all of the jobs given to the job handler have finished, and the sampler
       ## has nothing else to provide, then we are done with this step.
+      print('DEBUGG ----------------------- JUST CHECKING IF READY FOR STEP LOOP SAKE --------------------------')
       if jobHandler.isFinished() and not sampler.amIreadyToProvideAnInput():
         self.raiseADebug('Finished with %d runs submitted, %d jobs running, and %d completed jobs waiting to be processed.' % (jobHandler.numSubmitted(),jobHandler.numRunning(),len(jobHandler.getFinishedNoPop())) )
         break
