@@ -67,7 +67,7 @@ class ROM(Dummy):
     segment.addParam('grouping', segmentGroups)
     subspace = InputData.parameterInputFactory('subspace', contentType=InputData.StringType)
     subspace.addParam('divisions', InputData.IntegerType, False)
-    subspace.addParam('pivotLength', InputData.FloatType, False)
+    subspace.addParam('pivotLength', InputData.FloatListType, False)
     subspace.addParam('shift', InputData.StringType, False)
     segment.addSub(subspace)
     clusterEvalModeEnum = InputData.makeEnumType('clusterEvalModeEnum', 'clusterEvalModeType', ['clustered', 'truncated', 'full'])
@@ -265,6 +265,7 @@ class ROM(Dummy):
     inputSpecification.addSub(InputData.parameterInputFactory("coeffRegressor", contentType=coeffRegressorEnumType))
     # DMD
     inputSpecification.addSub(InputData.parameterInputFactory("rankSVD", contentType=InputData.IntegerType))
+    #inputSpecification.addSub(InputData.parameterInputFactory("rankSVD", contentType=InputData.IntegerTupleType))# List of integers
     inputSpecification.addSub(InputData.parameterInputFactory("energyRankSVD", contentType=InputData.FloatType))
     inputSpecification.addSub(InputData.parameterInputFactory("rankTLSQ", contentType=InputData.IntegerType))
     inputSpecification.addSub(InputData.parameterInputFactory("exactModes", contentType=InputData.BoolType))

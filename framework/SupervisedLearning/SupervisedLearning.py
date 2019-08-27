@@ -81,8 +81,6 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
     else:
       if type(arrayIn).__name__ not in ['ndarray','c1darray']:
         return (False,' The object is not a numpy array. Got type: '+type(arrayIn).__name__)
-      if len(np.asarray(arrayIn).shape) > 1:
-        return(False, ' The array must be 1-d. Got shape: '+str(np.asarray(arrayIn).shape))
     return (True,'')
 
   def __init__(self,messageHandler,**kwargs):
@@ -194,7 +192,7 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
       targetValues = np.concatenate([np.asarray(arr)[sl] for arr in targetValues], axis=np.asarray(targetValues[0]).ndim)
 
     # construct the evaluation matrixes
-    featureValues = np.zeros(shape=(len(targetValues),len(self.features)))
+    featureValues = np.zeros(shape=(np.shape(targetValues)[0],len(self.features)))
     for cnt, feat in enumerate(self.features):
       if feat not in names:
         self.raiseAnError(IOError,'The feature sought '+feat+' is not in the training set')
@@ -204,7 +202,7 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
         if not resp[0]:
           self.raiseAnError(IOError,'In training set for feature '+feat+':'+resp[1])
         valueToUse = np.asarray(valueToUse)
-        if len(valueToUse) != featureValues[:,0].size:
+        if np.shape(valueToUse)[0] != featureValues[:,0].size:
           self.raiseAWarning('feature values:',featureValues[:,0].size,tag='ERROR')
           self.raiseAWarning('target values:',len(valueToUse),tag='ERROR')
           self.raiseAnError(IOError,'In training set, the number of values provided for feature '+feat+' are != number of target outcomes!')
@@ -337,7 +335,18 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
       @ Out, None
     """
     writeTo.addScalar('ROM',"noInfo",'ROM has no special output options.')
-
+  
+  def writeGlobalXML(self, writeTo, targets=None, skip=None):
+    """
+      Writs out Global Segment information.
+      Overload in subclasses.
+      @ In, writeTo, xmlUtils.StaticXmlElement, StaticXmlElement to write to
+      @ In, targets, list, optional, list of targets for whom information should be written, unused
+      @ In, skip, list, optional, list of targets to skip, unused
+      @ Out, None
+    """
+    pass # override as needed
+  
   def isDynamic(self):
     """
       This method is a utility function that tells if the relative ROM is able to

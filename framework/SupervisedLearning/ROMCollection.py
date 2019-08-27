@@ -287,7 +287,7 @@ class Segments(Collection):
     """
     # write global information
     newNode = xmlUtils.StaticXmlElement('GlobalROM', attrib={'segment':'all'})
-    self._templateROM.writeXML(newNode, targets, skip)
+    self._templateROM.writeGlobalXML(newNode, targets, skip)
     writeTo.getRoot().append(newNode.getRoot())
     # write subrom information
     for i, rom in enumerate(self._roms):
@@ -417,7 +417,8 @@ class Segments(Collection):
     ## or the length of pivot values per segment in "value" mode
     self.raiseADebug('Training segmented subspaces for "{}" ...'.format(self._romName))
     for subspace, (mode, value) in divisionInstructions.items():
-      dataLen = len(trainingSet[subspace][0]) # TODO assumes syncronized histories, or single history
+      pivot = trainingSet[subspace][0]
+      dataLen = len(pivot) # TODO assumes syncronized histories, or single history
       self._divisionInfo['historyLength'] = dataLen # TODO assumes single pivotParameter
       if mode == 'split':
         numSegments = value # renamed for clarity
@@ -427,41 +428,51 @@ class Segments(Collection):
         counter = list((c[0], c[-1]) for c in counter)
         # Note that "segmented" doesn't have "unclustered" since chunks are evenly sized
       elif mode == 'value':
-        segmentValue = value # renamed for clarity
-        # divide the subspace into segments with roughly the same pivot length (e.g. time length)
-        pivot = trainingSet[subspace][0]
-        # find where the data passes the requested length, and make dividers
-        floor = 0                # where does this pivot segment start?
-        nextOne = segmentValue + pivot[0]   # how high should this pivot segment go?
-        counter = []
-        # TODO speedup; can we do this without looping?
-        dt = pivot[1] - pivot[0]
-        while floor < dataLen - 1:
-
-          cross = np.searchsorted(pivot, nextOne-0.5*dt) # half dt if for machine percision error
-          # if the next crossing point is past the end, put the remainder piece
-          ## into the "unclustered" grouping, since it might be very oddly sized
-          ## and throw off segmentation (specifically for clustering)
-          if cross == len(pivot):
-            remaining = pivot[-1] - pivot[floor-1]
-            oneLess = pivot[-2] - pivot[floor-1]
-            test1 = abs(remaining-segmentValue)/segmentValue
-            test2 = abs(oneLess-segmentValue)/segmentValue
-            if not (test1 or test2):
-              unclustered.append((floor, cross - 1))
+        if len(value)>1:
+          numSegments = len(value) # numSegments is length of the pivotLength list
+          floor = 0
+          counter = []
+          cross = np.searchsorted(trainingSet[subspace][0], value)
+          for i in cross:
+            if i == dataLen-1:
+              counter.append((floor-1,i))
               break
-            cross = len(pivot)
-          # add this segment, only really need to know the first and last index (inclusive)
-          counter.append((floor, cross - 1)) # Note: indices are INCLUSIVE
-          # update search parameters
-          floor = cross
-          if floor >= len(pivot):
-            break
-          nextOne = pivot[floor] + segmentValue
-        # #
-        # if counter[-1][1] == dataLen-2:
-        #   counter[-1]=(counter[-1][0],counter[-1][1]+1)
-
+            counter.append((floor,i-1))
+            floor = i
+        else:
+          segmentValue = value[0] # renamed for clarity
+          # divide the subspace into segments with roughly the same pivot length (e.g. time length)
+          pivot = trainingSet[subspace][0]
+          # find where the data passes the requested length, and make dividers
+          floor = 0                # where does this pivot segment start?
+          nextOne = segmentValue + pivot[0]   # how high should this pivot segment go?
+          counter = []
+          # TODO speedup; can we do this without looping?
+          dt = pivot[1] - pivot[0]
+          while floor < dataLen - 1:
+            cross = np.searchsorted(pivot, nextOne-0.5*dt) # half dt if for machine percision error
+            # if the next crossing point is past the end, put the remainder piece
+            ## into the "unclustered" grouping, since it might be very oddly sized
+            ## and throw off segmentation (specifically for clustering)
+            if cross == len(pivot):
+              remaining = pivot[-1] - pivot[floor-1]
+              oneLess = pivot[-2] - pivot[floor-1]
+              test1 = abs(remaining-segmentValue)/segmentValue
+              test2 = abs(oneLess-segmentValue)/segmentValue
+              if not (test1 or test2):
+                unclustered.append((floor, cross - 1))
+                break
+              cross = len(pivot)
+            # add this segment, only really need to know the first and last index (inclusive)
+            counter.append((floor, cross - 1)) # Note: indices are INCLUSIVE
+            # update search parameters
+            floor = cross
+            if floor >= len(pivot):
+              break
+            nextOne = pivot[floor] + segmentValue
+          # #
+          # if counter[-1][1] == dataLen-2:
+          #   counter[-1]=(counter[-1][0],counter[-1][1]+1)
       self.raiseADebug('Dividing {:^20s} into {:^5d} divisions for training ...'.format(subspace, len(counter) + len(unclustered)))
     # return the counter indicies as well as any odd-piece-out parts
     return counter, unclustered
@@ -506,7 +517,7 @@ class Segments(Collection):
       # slicer for data selection
       picker = slice(subdiv[0], subdiv[-1] + 1)
       ## TODO we need to be slicing all the data, not just one realization, once we support non-ARMA segmentation.
-      data = dict((var, [copy.deepcopy(trainingSet[var][0][picker])]) for var in trainingSet)
+      data = dict((var, copy.deepcopy(np.array(trainingSet[var])[:,picker])) for var in trainingSet)
       # renormalize the pivot if requested, e.g. by shifting values
       norm = self._divisionPivotShift[pivotID]
       if norm:

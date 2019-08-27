@@ -89,7 +89,8 @@ class DynamicModeDecomposition(supervisedLearning):
       @ Out, None
     """
     self.__dict__.update(state)
-    self.KDTreeFinder = spatial.KDTree(self.featureVals)
+    if self.amITrained:
+      self.KDTreeFinder = spatial.KDTree(self.featureVals)
 
   def _localNormalizeData(self,values,names,feat):
     """
@@ -320,4 +321,13 @@ class DynamicModeDecomposition(supervisedLearning):
       @ Out, self.dmdParams, dict, the dict of the SM settings
     """
     return self.dmdParams
-
+  
+  def adjustLocalRomSegment(self, settings, picker):
+    """
+      Adjusts this ROM to account for it being a segment as a part of a larger ROM collection.
+      Call this before training the subspace segment ROMs
+      Note this is called on the LOCAL subsegment ROMs, NOT on the GLOBAL templateROM from the ROMcollection!
+      @ In, settings, object, arbitrary information about ROM clustering settings from getGlobalRomSegmentSettings
+      @ Out, None
+    """
+    pass # override as needed
