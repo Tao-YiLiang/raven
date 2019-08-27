@@ -420,25 +420,30 @@ class Segments(Collection):
       pivot = trainingSet[subspace][0]
       dataLen = len(pivot) # TODO assumes syncronized histories, or single history
       self._divisionInfo['historyLength'] = dataLen # TODO assumes single pivotParameter
-      if mode == 'split':
+      if mode == 'split': # If the user inputs number of divisions
         numSegments = value # renamed for clarity
         # divide the subspace into equally-sized segments, store the indexes for each segment
         counter = np.array_split(np.arange(dataLen), numSegments)
         # only store bounds, not all indices in between -> note that this is INCLUSIVE!
         counter = list((c[0], c[-1]) for c in counter)
         # Note that "segmented" doesn't have "unclustered" since chunks are evenly sized
-      elif mode == 'value':
+      elif mode == 'value': # If the user inputs the pivotlength(s)
+        # Length of each segment is given, i.e., pivotLength is a list
         if len(value)>1:
           numSegments = len(value) # numSegments is length of the pivotLength list
           floor = 0
           counter = []
+          # search for the indecies of the given pivotLength
           cross = np.searchsorted(trainingSet[subspace][0], value)
           for i in cross:
+            # if the given index is at the end of the pivot parameter:
             if i == dataLen-1:
               counter.append((floor-1,i))
               break
+            # otherwise
             counter.append((floor,i-1))
             floor = i
+        # segments are determined by a single pivotLength, i.e., pivotLength is a float not a list of floats
         else:
           segmentValue = value[0] # renamed for clarity
           # divide the subspace into segments with roughly the same pivot length (e.g. time length)
