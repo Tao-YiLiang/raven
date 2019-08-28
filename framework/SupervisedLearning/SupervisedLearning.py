@@ -192,7 +192,11 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
       targetValues = np.concatenate([np.asarray(arr)[sl] for arr in targetValues], axis=np.asarray(targetValues[0]).ndim)
 
     # construct the evaluation matrixes
-    featureValues = np.zeros(shape=(np.shape(targetValues)[0],len(self.features)))
+    
+    # targetValues shouls be #Samples x #TimeStepsWithinSegment x #Targets
+    ## TODO: We need dimensionality assert statements all over the code especially for the segmenting/clustering Rom bussiness.
+     
+    featureValues = np.zeros(shape=(np.shape(targetValues)[0],len(self.features))) # now featureValues is #Samples x #Features   
     for cnt, feat in enumerate(self.features):
       if feat not in names:
         self.raiseAnError(IOError,'The feature sought '+feat+' is not in the training set')
@@ -201,7 +205,9 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
         resp = self.checkArrayConsistency(valueToUse, self.isDynamic())
         if not resp[0]:
           self.raiseAnError(IOError,'In training set for feature '+feat+':'+resp[1])
-        valueToUse = np.asarray(valueToUse)
+        valueToUse = np.asarray(valueToUse) # valueToUse is #Samples x #TimeStepsWithinSegment
+        # if the first dimension in valuesToUse is != first dimension in featureValues (#Samples),
+        # yet I prefer to use np.shape(featureValues[0]) instead!  
         if np.shape(valueToUse)[0] != featureValues[:,0].size:
           self.raiseAWarning('feature values:',featureValues[:,0].size,tag='ERROR')
           self.raiseAWarning('target values:',len(valueToUse),tag='ERROR')

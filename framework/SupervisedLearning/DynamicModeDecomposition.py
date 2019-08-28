@@ -89,6 +89,8 @@ class DynamicModeDecomposition(supervisedLearning):
       @ Out, None
     """
     self.__dict__.update(state)
+    # Although next line should not be executed unless the ROM is trained, this is allowed through ROM collections which is the only exception so far.
+    # That's why the if statement was added. 
     if self.amITrained:
       self.KDTreeFinder = spatial.KDTree(self.featureVals)
 

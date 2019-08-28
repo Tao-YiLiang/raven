@@ -416,6 +416,12 @@ class Segments(Collection):
     ## where "value" is the number of segments in "split" mode
     ## or the length of pivot values per segment in "value" mode
     self.raiseADebug('Training segmented subspaces for "{}" ...'.format(self._romName))
+    
+    # Preventing different legth segments if clusterable
+    # if clusterable and the length of the pivot parameter is greater than 1: 
+    if self.isClusterable() and len(divisionInstructions[list(self._divisionInstructions)[0]][-1])>1:
+      self.raiseAnError('Segments have to be of equal lengths to be clusterable')
+
     for subspace, (mode, value) in divisionInstructions.items():
       pivot = trainingSet[subspace][0]
       dataLen = len(pivot) # TODO assumes syncronized histories, or single history
@@ -429,7 +435,7 @@ class Segments(Collection):
         # Note that "segmented" doesn't have "unclustered" since chunks are evenly sized
       elif mode == 'value': # If the user inputs the pivotlength(s)
         # Length of each segment is given, i.e., pivotLength is a list
-        if len(value)>1:
+        if len(value)>1: # value has the same dimension as pivotLength (either 1x1 or 1 x number-of-segments)
           numSegments = len(value) # numSegments is length of the pivotLength list
           floor = 0
           counter = []
@@ -438,7 +444,7 @@ class Segments(Collection):
           for i in cross:
             # if the given index is at the end of the pivot parameter:
             if i == dataLen-1:
-              counter.append((floor-1,i))
+              counter.append((floor,i))
               break
             # otherwise
             counter.append((floor,i-1))
@@ -521,7 +527,7 @@ class Segments(Collection):
     for i, subdiv in enumerate(counter):
       # slicer for data selection
       picker = slice(subdiv[0], subdiv[-1] + 1)
-      ## TODO we need to be slicing all the data, not just one realization, once we support non-ARMA segmentation.
+      # Slicing all the data, not just one realization, once we support non-ARMA segmentation.
       data = dict((var, copy.deepcopy(np.array(trainingSet[var])[:,picker])) for var in trainingSet)
       # renormalize the pivot if requested, e.g. by shifting values
       norm = self._divisionPivotShift[pivotID]
