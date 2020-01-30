@@ -298,6 +298,23 @@ class GradientDescent(Sampled):
       newOpt, stepSize = self._stepInstance.step(opt, gradientHist=self._gradHistory[traj],
                                                  prevStepSize=self._stepHistory[traj],
                                                  recommend=self._stepRecommendations[traj])
+      # check new opt point against constraings
+      searchChecks = 100 # TODO user option, how many times to recheck? -> where does this belong? StepManip?
+      violations = self._checkBoundaryConstraints(newOpt)
+      violationFixingInfo = {'minStepSize': 1e-2 * stepSize, # TODO min boundary search cut: 1% of step size
+                             'originalStepSize': stepSize,   # original step size
+                            }
+      if violations: # DEBUGG
+        print('DEBUGG fixing constraint violations!')
+        print(' ... point of origin:', opt)
+        print(' ... attempted:', newOpt)
+      while violations:
+        print(' ... ... remaining tries:', searchChecks)
+        newOpt, stepSize, violationFixingInfo = self._stepInstance.fixConstraintViolations(newOpt, opt, violations, violationFixingInfo)
+        violations = self._checkBoundaryConstraints(newOpt)
+        searchChecks -= 1
+        if searchChecks == 0:
+          raise NotImplementedError('No acceptable opt point found! What now?')
       # clear recommendations on step size, since we took the recommendation
       self._stepRecommendations[traj] = None
       self._stepHistory[traj].append(stepSize)
@@ -379,9 +396,11 @@ class GradientDescent(Sampled):
       @ In, stepSize, float, nominal step size to use
       @ Out, None
     """
+    ### OPT POINT
     # submit opt point
     self.raiseADebug('* Submitting new opt and grad points *')
     self._submitRun(opt, traj, step, 'opt')
+    # GRAD POINTS
     # collect grad points
     gradPoints, gradInfos = self._gradientInstance.chooseEvaluationPoints(opt, stepSize)
     for i, grad in enumerate(gradPoints):
@@ -404,6 +423,7 @@ class GradientDescent(Sampled):
                  'step': step,
                  'purpose': purpose,
                 })
+    # NOTE: explicit constraints have been checked before this!
     self.raiseADebug('Adding run to queue: {} | {}'.format(point, info))
     #for key, inf in info.items():
     #  self.raiseADebug(' ... {}: {}'.format(key, inf))

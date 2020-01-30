@@ -236,6 +236,58 @@ class Sampled(Optimizer):
   ###################
   # Utility Methods #
   ###################
+  # * * * * * * * * * * * *
+  # Constraint Handling
+  def _checkExplicitConstraints(self, traj, point, info):
+    """
+      Checks that provided point does not violate constraints
+      @ In, traj, int, identifier
+      @ In, point, dict, suggested point to submit (normalized)
+      @ In, info, dict, data about suggested point
+      @ Out, newPoint, dict or None, constraint-fixed point to sample (or None if not discoverable)
+    """
+    denormed = self.denormalizeData(point)
+    # check boundaries
+    violations = self._checkBoundaryConstraints(denormed, info)
+    if violations:
+      self.raiseAWarning('Suggested point has boundary violations; searching for suitable point. See debug for more information.')
+      raise NotImplementedError
+    else:
+      newPoint = point
+
+    # FIXME TODO check functions
+
+  def _checkBoundaryConstraints(self, point):
+    """
+      Checks boundary constraints of variables in "point" -> DENORMED point expected!
+      @ In, point, dict, potential point against which to check
+      @ Out, violations, dict, variables and the violated conditions
+    """
+    violations = {}
+    for var in self.toBeSampled:
+      dist = self.distDict[var]
+      val = point[var]
+      lower = dist.lowerBound
+      upper = dist.upperBound
+      if lower is None:
+        lower = -np.inf
+      if upper is None:
+        upper = np.inf
+      if val < lower:
+        self.raiseADebug(' BOUNDARY VIOLATION "{}" suggested value: {:1.3e} lower bound: {:1.3e} under by {:1.3e}'
+                         .format(var, val, lower, lower - val))
+        self.raiseADebug(' ... -> for point {}'.format(point))
+        violations[var] = 'lowerBound'
+      elif val > upper:
+        self.raiseADebug(' BOUNDARY VIOLATION "{}" suggested value: {:1.3e} upper bound: {:1.3e} over by {:1.3e}'
+                         .format(var, val, upper, val - upper))
+        self.raiseADebug(' ... -> for point {}'.format(point))
+        violations[var] = 'upperBound'
+    return violations
+
+  # END constraint handling
+  # * * * * * * * * * * * *
+
   def _resolveNewOptPoint(self, traj, rlz, optVal, info):
     """
       Consider and store a new optimal point

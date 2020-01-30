@@ -939,5 +939,3 @@ def calculateMagnitudeAndVersor(vector, normalizeInfinity=True):
       #if len(entry) == 1:
       #  vector[e] = float(vector[e])
   return mag, vector, foundInf
-
-
