@@ -148,6 +148,7 @@ class GradientHistory(StepManipulator):
     else:
       ### rotate vector and restore full step size
       stepSize = fixInfo['originalStepSize']
+      ##### METHOD ONE: pick perpendicular and keep it
       # store original direction
       if 'originalDirection' not in fixInfo:
         fixInfo['originalDirection'] = stepDirection
@@ -159,6 +160,9 @@ class GradientHistory(StepManipulator):
         fixInfo['perpDir'] = perpDir
       ### rotate vector halfway towards perpendicular
       perpDir = fixInfo['perpDir']
+
+      ###### METHOD TWO: repick perpendicular each time
+
       # rotate
       splitVector = {} # vector that evenly divides stepDirection and perp
       for v, var in enumerate(self._optVars):

@@ -47,4 +47,15 @@
       zero_threshold = 1e-5
     [../]
   [../]
+
+  [./ConstrainBoundary]
+    type = 'RavenFramework'
+    input = 'constrain_boundary.xml'
+    [./data]
+      type = OrderedCSV
+      output = 'ConstrainBoundary/opt_export_0.csv'
+      rel_err = 1e-3
+      zero_threshold = 1e-5
+    [../]
+  [../]
 []

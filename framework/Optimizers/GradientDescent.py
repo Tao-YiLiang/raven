@@ -230,6 +230,8 @@ class GradientDescent(Sampled):
     if not self._convergenceCriteria:
       self.raiseAWarning('No convergence criteria given; using defaults.')
       self._convergenceCriteria['gradient'] = 1e-6
+    # same point is ALWAYS a criterion
+    self._convergenceCriteria['samePoint'] = 1e-16 # TODO user option?
 
   def initialize(self, externalSeeding=None, solutionExport=None):
     """
@@ -251,15 +253,21 @@ class GradientDescent(Sampled):
   ###############
   # Run Methods #
   ###############
-  def checkConvergence(self, traj):
+  def checkConvergence(self, traj, new, old):
     """
       Checks the active convergence criteria.
       @ In, traj, int, trajectory identifier
+      @ In, new, dict, new opt point
+      @ In, old, dict, previous opt point
       @ Out, converged, bool, convergence state
       @ Out, convs, dict, state of convergence criterions
     """
     convs = {}
     for conv in self._convergenceCriteria:
+      # special treatment for same point check
+      if conv == 'samePoint':
+        convs[conv] = self._checkConvSamePoint(new, old)
+        continue
       # fix capitalization for RAVEN standards
       fName = conv[:1].upper() + conv[1:]
       # get function from lookup
@@ -288,36 +296,34 @@ class GradientDescent(Sampled):
       self._resolveNewGradPoint(traj, rlz, optVal, info)
     if self._checkStepReady(traj):
       # get new gradient
+      self.raiseADebug('Opt point accepted and gradient points collected, searching new opt point ...')
       opt, _ = self._stepTracker[traj]['opt']
       grads, gradInfos = zip(*self._stepTracker[traj]['grads'])
       gradMag, gradVersor, _ = self._gradientInstance.evaluate(opt,
-                                                                      grads, gradInfos,
-                                                                      self._objectiveVar)
+                                                               grads, gradInfos,
+                                                               self._objectiveVar)
+      self.raiseADebug(' ... gradient calculated ...')
       self._gradHistory[traj].append((gradMag, gradVersor))
       # get new step information
       newOpt, stepSize = self._stepInstance.step(opt, gradientHist=self._gradHistory[traj],
                                                  prevStepSize=self._stepHistory[traj],
                                                  recommend=self._stepRecommendations[traj])
-      # check new opt point against constraings
-      searchChecks = 100 # TODO user option, how many times to recheck? -> where does this belong? StepManip?
-      violations = self._checkBoundaryConstraints(newOpt)
-      violationFixingInfo = {'minStepSize': 1e-2 * stepSize, # TODO min boundary search cut: 1% of step size
-                             'originalStepSize': stepSize,   # original step size
-                            }
-      if violations: # DEBUGG
-        print('DEBUGG fixing constraint violations!')
-        print(' ... point of origin:', opt)
-        print(' ... attempted:', newOpt)
-      while violations:
-        print(' ... ... remaining tries:', searchChecks)
-        newOpt, stepSize, violationFixingInfo = self._stepInstance.fixConstraintViolations(newOpt, opt, violations, violationFixingInfo)
-        violations = self._checkBoundaryConstraints(newOpt)
-        searchChecks -= 1
-        if searchChecks == 0:
-          raise NotImplementedError('No acceptable opt point found! What now?')
+      self.raiseADebug(' ... found new proposed opt point ...')
+      # check new opt point against constraints
+      suggested, modded = self._handleExplicitConstraints(newOpt, opt, 'opt')
+      if modded:
+        deltas = dict((var, suggested[var] - opt[var]) for var in self.toBeSampled)
+        stepSize = mathUtils.calculateMultivectorMagnitude(np.array(list(deltas.values())))
+        newOpt = suggested
+        # TODO what if suggested point ends up being the same as the previous point?
+        # If true and if 1 away from persistence convergence, then we could technically quit here!
+        # Maybe someday.
+
       # clear recommendations on step size, since we took the recommendation
       self._stepRecommendations[traj] = None
-      self._stepHistory[traj].append(stepSize)
+      # store previous step size (unless it was a SamePoint run!)
+      if stepSize > 0:
+        self._stepHistory[traj].append(stepSize)
       # start new step
       self._initializeStep(traj)
       self.raiseADebug('Taking step {} for traj {} ...'.format(self._stepCounter[traj], traj))
@@ -328,7 +334,7 @@ class GradientDescent(Sampled):
       self.raiseADebug(' ... current opt point:', self.denormalizeData(opt))
       self.raiseADebug(' ... new optimum candidate:', self.denormalizeData(newOpt))
       # initialize step
-      self._submitOptAndGrads(newOpt, traj, self._stepCounter[traj], stepSize)
+      self._submitOptAndGrads(newOpt, traj, self._stepCounter[traj], self._stepHistory[traj][-1])
     # otherwise, continue submitting and collecting
 
   ###################
@@ -386,6 +392,42 @@ class GradientDescent(Sampled):
     self._stepTracker[traj]['grads'].append((rlz, info))
 
   # * * * * * * * * * * * * * * * *
+  # Resolving potential opt points
+  def _applyBoundaryConstraints(self, point):
+    """
+      Checks and fixes boundary constraints of variables in "point" -> DENORMED point expected!
+      @ In, point, dict, potential point against which to check
+      @ Out, point, dict, adjusted variables
+      @ Out, modded, bool, whether point was modified or not
+    """
+    # TODO should some of this go into the parent Optimizer class, such as the boundary acquiring?
+    modded = False
+    for var in self.toBeSampled:
+      dist = self.distDict[var]
+      val = point[var]
+      lower = dist.lowerBound
+      upper = dist.upperBound
+      if lower is None:
+        lower = -np.inf
+      if upper is None:
+        upper = np.inf
+      if val < lower:
+        self.raiseADebug(' BOUNDARY VIOLATION "{}" suggested value: {:1.3e} lower bound: {:1.3e} under by {:1.3e}'
+                         .format(var, val, lower, lower - val))
+        self.raiseADebug(' ... -> for point {}'.format(point))
+        point[var] = lower
+        modded = True
+      elif val > upper:
+        self.raiseADebug(' BOUNDARY VIOLATION "{}" suggested value: {:1.3e} upper bound: {:1.3e} over by {:1.3e}'
+                         .format(var, val, upper, val - upper))
+        self.raiseADebug(' ... -> for point {}'.format(point))
+        point[var] = upper
+        modded = True
+    return point, modded
+  # END resolving potential opt points
+  # * * * * * * * * * * * * * * * *
+
+  # * * * * * * * * * * * * * * * *
   # Queuing Runs
   def _submitOptAndGrads(self, opt, traj, step, stepSize):
     """
@@ -434,10 +476,11 @@ class GradientDescent(Sampled):
 
   # * * * * * * * * * * * * * * * *
   # Resolving potential opt points
-  def _checkAcceptability(self, traj, optVal):
+  def _checkAcceptability(self, traj, opt, optVal):
     """
       Check if new opt point is acceptably better than the old one
       @ In, traj, int, identifier
+      @ In, opt, dict, new opt point
       @ In, optVal, float, new optimization value
       @ Out, acceptable, str, acceptability condition for point
       @ Out, old, dict, old opt point
@@ -447,6 +490,7 @@ class GradientDescent(Sampled):
     try:
       old, _ = self._optPointHistory[traj][-1]
       oldVal = self._collectOptValue(old)
+      # check if same point
       self.raiseADebug(' ... change: {d: 1.3e} new: {n: 1.6e} old: {o: 1.6e}'
                       .format(d=optVal-oldVal, o=oldVal, n=optVal))
       # if this is an opt point rerun, accept it without checking.
@@ -454,6 +498,9 @@ class GradientDescent(Sampled):
         acceptable = 'rerun'
         self._acceptRerun[traj] = False
         self._stepRecommendations[traj] = 'shrink' # FIXME how much do we really want this?
+      elif all(opt[var] == old[var] for var in self.toBeSampled):
+        # this is the classic "same point" trap; we accept the same point, and check convergence later
+        acceptable = 'accepted'
       else:
         acceptable = self._checkForImprovement(optVal, oldVal)
     except IndexError:
@@ -475,7 +522,7 @@ class GradientDescent(Sampled):
     improved = self._acceptInstance.checkImprovement(new, old)
     return 'accepted' if improved else 'rejected'
 
-  def _updateConvergence(self, traj, acceptable):
+  def _updateConvergence(self, traj, new, old, acceptable):
     """
       Updates convergence information for trajectory
       @ In, traj, int, identifier
@@ -486,7 +533,7 @@ class GradientDescent(Sampled):
     if acceptable == 'accepted':
       self.raiseADebug('Convergence Check for Trajectory {}:'.format(traj))
       # check convergence
-      converged, convDict = self.checkConvergence(traj)
+      converged, convDict = self.checkConvergence(traj, new, old)
     else:
       converged = False
       convDict = dict((var, False) for var in self._convergenceInfo[traj])
@@ -570,6 +617,24 @@ class GradientDescent(Sampled):
   # Convergence Checks
   # Note these names need to be formatted according to checkConvergence check!
   convFormat = ' ... {name:^12s}: {conv:5s}, {got:1.2e} / {req:1.2e}'
+
+  # NOTE checkConvSamePoint has a different call than the others
+  # should this become an informational dict that can be passed to any of them?
+  def _checkConvSamePoint(self, new, old):
+    """
+      Checks for a repeated same point
+      @ In, new, dict, new opt point
+      @ In, old, dict, old opt point
+      @ Out, converged, bool, convergence state
+    """
+    # TODO diff within tolerance? Exactly equivalent seems good for now
+    same = list(new[var] == old[var] for var in self.toBeSampled)
+    converged = all(same)
+    self.raiseADebug(self.convFormat.format(name='same point',
+                                            conv=str(converged),
+                                            got=sum(same),
+                                            req=len(same)))
+    return converged
 
   def _checkConvGradient(self, traj):
     """

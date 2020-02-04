@@ -238,56 +238,56 @@ class Sampled(Optimizer):
   ###################
   # * * * * * * * * * * * *
   # Constraint Handling
-  def _checkExplicitConstraints(self, traj, point, info):
+  def _handleExplicitConstraints(self, proposed, previous, pointType):
     """
-      Checks that provided point does not violate constraints
+      Considers all explicit (i.e. input-based) constraints
       @ In, traj, int, identifier
-      @ In, point, dict, suggested point to submit (normalized)
+      @ In, proposed, dict, NORMALIZED sample opt point
+      @ In, proposed, dict, NORMALIZED previous opt point
+      @ In, pointType, string, type of point to handle constraints for
+      @ Out, normed, dict, suggested NORMALIZED contraint-handled point
+      @ Out, modded, bool, whether point was modified or not
+    """
+    denormed = self.denormalizeData(proposed)
+    # check and fix boundaries
+    denormed, modded = self._applyBoundaryConstraints(denormed)
+    # check functionals
+    # TODO
+    # fix functionals
+    # TODO
+    # return
+    if modded:
+      normed = self.normalizeData(denormed)
+      print('DEBUGG had some modding! New:', normed)
+    else:
+      normed = proposed
+    return normed, modded
+
+  def _checkFunctionalConstraints(self, traj, point, info):
+    """
+      Checks that provided point does not violate functional constraints
+      @ In, traj, int, identifier
+      @ In, point, dict, suggested point to submit (denormalized)
       @ In, info, dict, data about suggested point
       @ Out, newPoint, dict or None, constraint-fixed point to sample (or None if not discoverable)
     """
-    denormed = self.denormalizeData(point)
     # check boundaries
-    violations = self._checkBoundaryConstraints(denormed, info)
-    if violations:
-      self.raiseAWarning('Suggested point has boundary violations; searching for suitable point. See debug for more information.')
-      raise NotImplementedError
-    else:
-      newPoint = point
-
     # FIXME TODO check functions
+    TODO
 
-  def _checkBoundaryConstraints(self, point):
+  @abc.abstractmethod
+  def _applyBoundaryConstraints(self, point):
     """
-      Checks boundary constraints of variables in "point" -> DENORMED point expected!
+      Checks and fixes boundary constraints of variables in "point" -> DENORMED point expected!
       @ In, point, dict, potential point against which to check
-      @ Out, violations, dict, variables and the violated conditions
+      @ Out, point, dict, adjusted variables
+      @ Out, modded, bool, whether point was modified or not
     """
-    violations = {}
-    for var in self.toBeSampled:
-      dist = self.distDict[var]
-      val = point[var]
-      lower = dist.lowerBound
-      upper = dist.upperBound
-      if lower is None:
-        lower = -np.inf
-      if upper is None:
-        upper = np.inf
-      if val < lower:
-        self.raiseADebug(' BOUNDARY VIOLATION "{}" suggested value: {:1.3e} lower bound: {:1.3e} under by {:1.3e}'
-                         .format(var, val, lower, lower - val))
-        self.raiseADebug(' ... -> for point {}'.format(point))
-        violations[var] = 'lowerBound'
-      elif val > upper:
-        self.raiseADebug(' BOUNDARY VIOLATION "{}" suggested value: {:1.3e} upper bound: {:1.3e} over by {:1.3e}'
-                         .format(var, val, upper, val - upper))
-        self.raiseADebug(' ... -> for point {}'.format(point))
-        violations[var] = 'upperBound'
-    return violations
-
   # END constraint handling
   # * * * * * * * * * * * *
 
+  # * * * * * * * * * * * * * * * *
+  # Resolving potential opt points
   def _resolveNewOptPoint(self, traj, rlz, optVal, info):
     """
       Consider and store a new optimal point
@@ -296,14 +296,13 @@ class Sampled(Optimizer):
       @ In, rlz, dict, realized realization
       @ In, optVal, float, value of objective variable (corrected for min/max)
     """
-    ## ***** TODO ***** Break this into submethods, this is too much!
     self.raiseADebug('*'*80)
     self.raiseADebug('Trajectory {} iteration {} resolving new opt point ...'.format(traj, info['step']))
     # note the collection of the opt point
     self._stepTracker[traj]['opt'] = (rlz, info)
     # FIXME check implicit constraints? Function call, - Jia
-    acceptable, old = self._checkAcceptability(traj, optVal)
-    converged = self._updateConvergence(traj, acceptable)
+    acceptable, old = self._checkAcceptability(traj, rlz, optVal)
+    converged = self._updateConvergence(traj, rlz, old, acceptable)
     self._updatePersistence(traj, converged, optVal)
     # NOTE: the solution export needs to be updated BEFORE we run rejectOptPoint or extend the opt
     #       point history.
@@ -322,17 +321,18 @@ class Sampled(Optimizer):
 
   # support methods for _resolveNewOptPoint
   @abc.abstractmethod
-  def _checkAcceptability(self, traj, optVal):
+  def _checkAcceptability(self, traj, opt, optVal):
     """
       Check if new opt point is acceptably better than the old one
       @ In, traj, int, identifier
+      @ In, opt, dict, new opt point
       @ In, optVal, float, new optimization value
       @ Out, acceptable, str, acceptability condition for point
       @ Out, old, dict, old opt point
     """
 
   @abc.abstractmethod
-  def _updateConvergence(self, traj, acceptable):
+  def _updateConvergence(self, traj, rlz, old, acceptable):
     """
       Updates convergence information for trajectory
       @ In, traj, int, identifier
@@ -368,7 +368,8 @@ class Sampled(Optimizer):
       @ In, info, dict, meta information about the opt point
       @ In, old, dict, previous optimal point (to resubmit)
     """
-  # END support methods for _resolveNewOptPoint
+  # END resolving potential opt points
+  # * * * * * * * * * * * * * * * *
 
   def _cancelAssociatedJobs(self, traj, step=None):
     """

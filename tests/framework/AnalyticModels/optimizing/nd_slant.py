@@ -24,15 +24,15 @@ def run(raven, Inputs):
     @ In, Input, dict, dictionary containing inputs from RAVEN
     @ Out, None
   """
-  vs = list(Inputs.values())
-  raven.ans = main(*vs)
+  #vs = list(Inputs.values())
+  raven.ans = main(raven.x, raven.y)
 
-def main(*vs):
+def main(x, y):
   """
     Evaluation.
-    @ In, vs, list, list of floats
+    @ In, x, float, value
+    @ In, y, float, value
     @ Out, ans, float, value
   """
-  N = len(vs)
-  val = 1.0 - np.sum(vs)/N
+  val = 1.0 - (x+y)/2.0
   return val
