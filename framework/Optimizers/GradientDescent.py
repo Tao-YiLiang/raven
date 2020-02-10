@@ -298,6 +298,7 @@ class GradientDescent(Sampled):
       # get new gradient
       self.raiseADebug('Opt point accepted and gradient points collected, searching new opt point ...')
       opt, _ = self._stepTracker[traj]['opt']
+      print('DEBUGG starting from opt point:', self.denormalizeData(opt))
       grads, gradInfos = zip(*self._stepTracker[traj]['grads'])
       gradMag, gradVersor, _ = self._gradientInstance.evaluate(opt,
                                                                grads, gradInfos,
@@ -309,9 +310,12 @@ class GradientDescent(Sampled):
                                                  prevStepSize=self._stepHistory[traj],
                                                  recommend=self._stepRecommendations[traj])
       self.raiseADebug(' ... found new proposed opt point ...')
+      print('DEBUGG ... ... normed stepSize:', stepSize)
+      print('DEBUGG ... ... proposed:', self.denormalizeData(newOpt))
       # check new opt point against constraints
       suggested, modded = self._handleExplicitConstraints(newOpt, opt, 'opt')
       if modded:
+        # update the step size and suggested new opt point
         deltas = dict((var, suggested[var] - opt[var]) for var in self.toBeSampled)
         stepSize = mathUtils.calculateMultivectorMagnitude(np.array(list(deltas.values())))
         newOpt = suggested
@@ -424,6 +428,58 @@ class GradientDescent(Sampled):
         point[var] = upper
         modded = True
     return point, modded
+
+  def _applyFunctionalConstraints(self, suggested, previous):
+    """
+      @ In, suggested, dict, NORMALIZED suggested point
+      @ In, previous, dict, NORMALIZED previous point
+      @ Out, suggested, dict, fixed up normalized point
+      @ Out, modded, bool, True if point was modified within this method
+    """
+    # assume no modifications until proved otherwise
+    modded = False
+    # are we violating functional constraints?
+    passFuncs = self._checkFunctionalConstraints(self.denormalizeData(suggested))
+    # while in violation of constraints ...
+    info = {'minStepSize': self._convergenceCriteria.get('stepSize', 1e-10)} # TODO why 1e-10?
+    tries = 500
+    while not passFuncs:
+      # DEBUGG
+      modded = True
+      import matplotlib.pyplot as plt
+      fig, ax = plt.subplots(figsize=(12,10))
+      xs, ys, ms = [], [], []
+      x, y = suggested['x'], suggested['y']
+      xs.append(x)
+      ys.append(y)
+      ms.append('$0$')
+      for i, x in enumerate(xs):
+        ax.plot(x, ys[i], marker=ms[i])
+      #  try to find new acceptable point
+      denormed = self.denormalizeData(suggested)
+      # DEBUGG XXX FIXME TODO remove
+      rlz = {'trajID': 0,
+             'x': denormed['x'],
+             'y': denormed['y'],
+             'ans': 1 - tries / 100,
+             'stepSize': 9999,
+             'iteration': 9999,
+             'accepted': 'search',
+             'conv_gradient': 0,
+            }
+      rlz = dict((key, np.atleast_1d(val)) for key, val in rlz.items())
+      self._solutionExport.addRealization(rlz)
+      print('DEBUGG subtry:', rlz['ans'])
+      suggested, stepSize, info = self._stepInstance.fixConstraintViolations(suggested, previous, info, ax)
+      plt.show()
+      denormed = self.denormalizeData(suggested)
+      self.raiseADebug(' ... suggested norm step {:1.2e}, new opt {}'.format(stepSize, denormed))
+      passFuncs = self._checkFunctionalConstraints(denormed)
+      tries -= 1
+      if tries == 0:
+        self.raiseAnError(NotImplementedError, 'No acceptable point findable! Now what?')
+    return suggested, modded
+
   # END resolving potential opt points
   # * * * * * * * * * * * * * * * *
 

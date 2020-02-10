@@ -250,36 +250,73 @@ class Sampled(Optimizer):
     """
     denormed = self.denormalizeData(proposed)
     # check and fix boundaries
-    denormed, modded = self._applyBoundaryConstraints(denormed)
-    # check functionals
-    # TODO
+    denormed, boundaryModded = self._applyBoundaryConstraints(denormed)
+    normed = self.normalizeData(denormed)
     # fix functionals
-    # TODO
+    normed, funcModded = self._applyFunctionalConstraints(normed, previous)
+    modded = boundaryModded or funcModded
+    # passFuncs = self._checkFunctionalConstraints(denormed)
+    # # fix functionals
+    # while not passFuncs:
+    #   modded = True
+    #   # try to find acceptable point
+    #   new = self._applyFunctionalConstraints(denormed, )
+    #   # check functionals
+    #   passFuncs = self._checkFunctionalConstraints(denormed)
+    #   if passFuncs:
+    #     # check boundaries
+    #     denormed, _ = self._applyBoundaryConstraints(denormed)
+    #   TODO
+    if funcModded:
+      print('DEBUGG modified by functional constraint!')
+    elif boundaryModded:
+      print('DEBUGG modified by boundary constraint!')
+    else:
+      print('DEBUGG unmodified by constraints!')
     # return
     if modded:
-      normed = self.normalizeData(denormed)
+      #normed = self.normalizeData(denormed)
       print('DEBUGG had some modding! New:', normed)
-    else:
-      normed = proposed
+    #else:
+    #  normed = proposed
     return normed, modded
 
-  def _checkFunctionalConstraints(self, traj, point, info):
+  def _checkFunctionalConstraints(self, point):
     """
       Checks that provided point does not violate functional constraints
       @ In, traj, int, identifier
       @ In, point, dict, suggested point to submit (denormalized)
       @ In, info, dict, data about suggested point
-      @ Out, newPoint, dict or None, constraint-fixed point to sample (or None if not discoverable)
+      @ Out, okay, bool, False if violations found else True
     """
-    # check boundaries
+    allOkay = True
+    inputs = dict(point)
+    inputs.update(self.constants)
+    # TODO add functional evaluations?
+    for constraint in self._constraintFunctions:
+      okay = constraint.evaluate('constrain', inputs)
+      if not okay:
+        self.raiseADebug('Functional constraint "{n}" was violated!'.format(n=constraint.name))
+        self.raiseADebug(' ... point:', point)
+      allOkay *= okay
     # FIXME TODO check functions
-    TODO
+    return allOkay
 
   @abc.abstractmethod
   def _applyBoundaryConstraints(self, point):
     """
       Checks and fixes boundary constraints of variables in "point" -> DENORMED point expected!
       @ In, point, dict, potential point against which to check
+      @ Out, point, dict, adjusted variables
+      @ Out, modded, bool, whether point was modified or not
+    """
+
+  @abc.abstractmethod
+  def _applyFunctionalConstraints(self, suggested, previous):
+    """
+      fixes functional constraints of variables in "point" -> DENORMED point expected!
+      @ In, suggested, dict, potential point to apply constraints to
+      @ In, previous, dict, previous opt point in consideration
       @ Out, point, dict, adjusted variables
       @ Out, modded, bool, whether point was modified or not
     """
@@ -309,7 +346,6 @@ class Sampled(Optimizer):
     self._updateSolutionExport(traj, rlz, acceptable) # NOTE: only on opt point!
     self.raiseADebug('*'*80)
     # decide what to do next
-    #if acceptable in ['accepted', 'rerun', 'first']:
     if acceptable in ['accepted', 'first']:
       # record history
       self._optPointHistory[traj].append((rlz, info))

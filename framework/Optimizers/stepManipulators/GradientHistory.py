@@ -121,12 +121,11 @@ class GradientHistory(StepManipulator):
       newOpt[var] = prevOpt[var] - stepSize * gradient[var]
     return newOpt, stepSize
 
-  def fixConstraintViolations(self, proposed, previous, violations, fixInfo):
+  def fixConstraintViolations(self, proposed, previous, fixInfo, ax):
     """
       Given constraint violations, update the desired optimal point to consider.
       @ In, proposed, dict, proposed new optimal point
       @ In, previous, dict, previous optimal point
-      @ In, violations, dict, record of variables and their constraint violations
       @ In, fixInfo, dict, contains record of progress in fixing search
       @ Out, proposed, new proposed point
       @ Out, stepSize, new step size taken # TODO need?
@@ -137,13 +136,35 @@ class GradientHistory(StepManipulator):
     minStepSize = fixInfo['minStepSize']
     stepVector = dict((var, proposed[var] - previous[var]) for var in self._optVars)
     stepDistance, stepDirection, _ = mathUtils.calculateMagnitudeAndVersor(list(stepVector.values()))
+    if 'originalStepSize' not in fixInfo:
+      print('DEBUGG updated oss')
+      fixInfo['originalStepSize'] = stepDistance
+    oss = fixInfo['originalStepSize']
+    ax.set_xlim(previous['x'] - oss, previous['x'] + oss)
+    ax.set_ylim(previous['y'] - oss, previous['y'] + oss)
+    ax.arrow(previous['x'], previous['y'],
+             oss*stepDirection[0], oss*stepDirection[1],
+             color='g', alpha=0.5, length_includes_head=True, width=oss/5)
+    if 'originalDirection' in fixInfo:
+      og = fixInfo['originalDirection']
+      ax.arrow(previous['x'], previous['y'],
+              oss*og[0], oss*og[1],
+              color='b', ls=':', alpha=0.5, length_includes_head=True, width=oss/5)
+    if 'perpDir' in fixInfo:
+      perpDir = fixInfo['perpDir']
+      ax.arrow(previous['x'], previous['y'],
+              oss*perpDir[0], oss*perpDir[1],
+              color='k', ls=':', alpha=0.5, length_includes_head=True, width=oss/5)
     # if not done cutting step, start cutting
     if stepDistance > minStepSize:
       # cut step again
       stepSize = 0.5 * stepDistance # TODO user option?
       for v, var in enumerate(stepVector):
         proposed[var] = previous[var] + stepSize * stepDirection[v]
-      print(' ... cut step to {}, new opt {}'.format(stepSize, proposed))
+      print(' ... cutting step ...') # norm step to {}, new norm opt {}'.format(stepSize, proposed))
+      ax.arrow(previous['x'], previous['y'],
+              stepSize*stepDirection[0], stepSize*stepDirection[1],
+              color='r', alpha=0.5, length_includes_head=True, width=stepSize/5)
       return proposed, stepSize, fixInfo
     else:
       ### rotate vector and restore full step size
@@ -157,6 +178,9 @@ class GradientHistory(StepManipulator):
         # NOTE we could return to point format, but no reason to
         # normalize perpendicular to versor and resize
         _, perpDir, _ = mathUtils.calculateMagnitudeAndVersor(perp)
+        ax.arrow(previous['x'], previous['y'],
+                stepSize*perpDir[0], stepSize*perpDir[1],
+                color='k', ls=':', alpha=0.5, length_includes_head=True, width=stepSize/5)
         fixInfo['perpDir'] = perpDir
       ### rotate vector halfway towards perpendicular
       perpDir = fixInfo['perpDir']
@@ -166,11 +190,15 @@ class GradientHistory(StepManipulator):
       # rotate
       splitVector = {} # vector that evenly divides stepDirection and perp
       for v, var in enumerate(self._optVars):
-        splitVector[var] = - stepDirection[v] + perpDir[v]
+        splitVector[var] = stepDirection[v] + perpDir[v]
+        #splitVector[var] = - stepDirection[v] + perpDir[v]
       _, splitDir, _ = mathUtils.calculateMagnitudeAndVersor(list(splitVector.values()))
+      ax.arrow(previous['x'], previous['y'],
+              stepSize*splitDir[0], stepSize*splitDir[1],
+              color='r', ls=':', alpha=0.5, length_includes_head=True, width=stepSize/5)
       for v, var in enumerate(self._optVars):
         proposed[var] = previous[var] + stepSize * splitDir[v]
-      print(' ... rotated to {}, new opt {}'.format(splitDir, proposed))
+      print(' ... rotating step ...') #ed norm direction to {}, new norm opt {}'.format(splitDir, proposed))
     return proposed, stepSize, fixInfo
 
   ###################

@@ -89,5 +89,8 @@ from nd_slant import main as nd_slant
 x, y, z = plotFunction('ND-Slant', nd_slant, 0, 1, log=False)
 pk.dump((x,y,z),open('ndslant_plotdata.pk','wb'))
 
+from offset_parabola import main as offset_parabola
+x, y, z = plotFunction('Offset Parabola', offset_parabola, -1, 1, log=False)
+pk.dump((x,y,z),open('offset_parabola_plotdata.pk','wb'))
 
 plt.show()
