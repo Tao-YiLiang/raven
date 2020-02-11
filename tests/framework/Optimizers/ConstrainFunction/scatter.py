@@ -29,9 +29,9 @@ acceptanceMap = {'first': True,
                 }
 
 # add constraint
-#import matplotlib.patches as mpatches
-#circ = mpatches.Circle((0,0), 0.2, fill=False, color='y')
-#ax.add_artist(circ)
+import matplotlib.patches as mpatches
+circ = mpatches.Circle((0,0), 0.2, fill=False, color='y')
+ax.add_artist(circ)
 ax.plot([0.25, 0.75,0.75, 0.25, 0.25], [0, 0, 1, 1, 0], 'k-')
 
 # load walk data
@@ -61,11 +61,11 @@ for c,case in enumerate(cases):
         elif a == 'rerun':
           m = '.'
         elif a == 'rejected':
-          m = 'x{}'.format(accepted)
+          m = '$x{}$'.format(accepted)
         else:
           print(a)
           raise NotImplementedError
-        ax.plot(x, y, marker=m)
+        ax.plot(x, y, marker=m, ms=12)
   except IOError:
     cases = cases[:c]
     break

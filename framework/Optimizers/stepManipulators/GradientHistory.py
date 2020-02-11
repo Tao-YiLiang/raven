@@ -29,6 +29,7 @@ import numpy as np
 #Internal Modules------------------------------------------------------------------------------------
 from utils import InputData, InputTypes, mathUtils, randomUtils
 from .StepManipulator import StepManipulator
+from . import NoConstraintResolutionFound
 #Internal Modules End--------------------------------------------------------------------------------
 
 class GradientHistory(StepManipulator):
@@ -68,7 +69,7 @@ class GradientHistory(StepManipulator):
     self._growth = 1.25
     self._shrink = 1.15
     self._minRotationAngle = 2.0 # how close to perpendicular should we try rotating towards?
-    self._numRandomPerp = 3      # how many random perpendiculars should we try rotating towards?
+    self._numRandomPerp = 10     # how many random perpendiculars should we try rotating towards?
     # __private
     # additional methods
 
@@ -123,7 +124,7 @@ class GradientHistory(StepManipulator):
       newOpt[var] = prevOpt[var] - stepSize * gradient[var]
     return newOpt, stepSize
 
-  def fixConstraintViolations(self, proposed, previous, fixInfo, ax):
+  def fixConstraintViolations(self, proposed, previous, fixInfo):
     """
       Given constraint violations, update the desired optimal point to consider.
       @ In, proposed, dict, proposed new optimal point
@@ -144,24 +145,9 @@ class GradientHistory(StepManipulator):
     stepVector = dict((var, proposed[var] - previous[var]) for var in self._optVars)
     stepDistance, stepDirection, _ = mathUtils.calculateMagnitudeAndVersor(list(stepVector.values()))
     if 'originalStepSize' not in fixInfo:
-      print('DEBUGG updated oss')
       fixInfo['originalStepSize'] = stepDistance
-    oss = fixInfo['originalStepSize']
-    ax.set_xlim(previous['x'] - oss, previous['x'] + oss)
-    ax.set_ylim(previous['y'] - oss, previous['y'] + oss)
-    ax.arrow(previous['x'], previous['y'],
-             oss*stepDirection[0], oss*stepDirection[1],
-             color='g', alpha=0.5, length_includes_head=True, width=oss/5)
-    if 'originalDirection' in fixInfo:
-      og = fixInfo['originalDirection']
-      ax.arrow(previous['x'], previous['y'],
-              oss*og[0], oss*og[1],
-              color='b', ls=':', alpha=0.5, length_includes_head=True, width=oss/5)
     if 'perpDir' in fixInfo:
       perpDir = fixInfo['perpDir']
-      ax.arrow(previous['x'], previous['y'],
-              oss*perpDir[0], oss*perpDir[1],
-              color='k', ls=':', alpha=0.5, length_includes_head=True, width=oss/5)
     # if not done cutting step, start cutting
     if stepDistance > minStepSize:
       # cut step again
@@ -169,9 +155,6 @@ class GradientHistory(StepManipulator):
       for v, var in enumerate(stepVector):
         proposed[var] = previous[var] + stepSize * stepDirection[v]
       print(' ... cutting step ...') # norm step to {}, new norm opt {}'.format(stepSize, proposed))
-      ax.arrow(previous['x'], previous['y'],
-              stepSize*stepDirection[0], stepSize*stepDirection[1],
-              color='r', alpha=0.5, length_includes_head=True, width=stepSize/5)
       return proposed, stepSize, fixInfo
     else:
       ### rotate vector and restore full step size
@@ -182,7 +165,7 @@ class GradientHistory(StepManipulator):
       # if this isn't the first time, check if there's angle left to rotate through; reset if not
       if 'perpDir' in fixInfo:
         ang = mathUtils.angleBetweenVectors(stepDirection, fixInfo['perpDir'])
-        print('DEBUGG current angle:', ang)
+        print(' ... trying angle:', ang)
         if ang < self._minRotationAngle:
           del fixInfo['perpDir']
 
@@ -193,11 +176,8 @@ class GradientHistory(StepManipulator):
         # normalize perpendicular to versor and resize
         rotations = fixInfo.get('numRotations', 0)
         if rotations > self._numRandomPerp:
-          raise IndexError # TODO use a custom error!
+          raise NoConstraintResolutionFound
         _, perpDir, _ = mathUtils.calculateMagnitudeAndVersor(perp)
-        ax.arrow(previous['x'], previous['y'],
-                stepSize*perpDir[0], stepSize*perpDir[1],
-                color='k', ls=':', alpha=0.5, length_includes_head=True, width=stepSize/5)
         fixInfo['perpDir'] = perpDir
         fixInfo['numRotations'] = rotations + 1
       # END fixing perpendicular direction
@@ -210,9 +190,6 @@ class GradientHistory(StepManipulator):
         splitVector[var] = stepDirection[v] + perpDir[v]
         #splitVector[var] = - stepDirection[v] + perpDir[v]
       _, splitDir, _ = mathUtils.calculateMagnitudeAndVersor(list(splitVector.values()))
-      ax.arrow(previous['x'], previous['y'],
-              stepSize*splitDir[0], stepSize*splitDir[1],
-              color='r', ls=':', alpha=0.5, length_includes_head=True, width=stepSize/5)
       for v, var in enumerate(self._optVars):
         proposed[var] = previous[var] + stepSize * splitDir[v]
       print(' ... rotating step ...') #ed norm direction to {}, new norm opt {}'.format(splitDir, proposed))

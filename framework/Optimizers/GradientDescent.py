@@ -36,6 +36,7 @@ from .gradients import returnClass as gradReturnClass
 from .stepManipulators import knownTypes as stepKnownTypes
 from .stepManipulators import returnInstance as stepReturnInstance
 from .stepManipulators import returnClass as stepReturnClass
+from .stepManipulators import NoConstraintResolutionFound
 from .acceptanceConditions import knownTypes as acceptKnownTypes
 from .acceptanceConditions import returnInstance as acceptReturnInstance
 from .acceptanceConditions import returnClass as acceptReturnClass
@@ -313,26 +314,40 @@ class GradientDescent(Sampled):
       print('DEBUGG ... ... normed stepSize:', stepSize)
       print('DEBUGG ... ... proposed:', self.denormalizeData(newOpt))
       # check new opt point against constraints
-      suggested, modded = self._handleExplicitConstraints(newOpt, opt, 'opt')
+      try:
+        suggested, modded = self._handleExplicitConstraints(newOpt, opt, 'opt')
+      except NoConstraintResolutionFound:
+        # we've tried everything, but we just can't hack it
+        self.raiseAMessage('Optimizer "{}" trajectory {} was unable to continue due to functional or boundary constraints.'
+                           .format(self.name, traj))
+        self._closeTrajectory(traj, 'converge', 'no constraint resolution', opt[self._objectiveVar])
+        return
       if modded:
         # update the step size and suggested new opt point
         deltas = dict((var, suggested[var] - opt[var]) for var in self.toBeSampled)
-        stepSize = mathUtils.calculateMultivectorMagnitude(np.array(list(deltas.values())))
+        # TODO how do we use this modded step size?
+        modStepSize = mathUtils.calculateMultivectorMagnitude(np.array(list(deltas.values())))
         newOpt = suggested
         # TODO what if suggested point ends up being the same as the previous point?
         # If true and if 1 away from persistence convergence, then we could technically quit here!
         # Maybe someday.
+      else:
+        modStepSize = stepSize
 
       # clear recommendations on step size, since we took the recommendation
       self._stepRecommendations[traj] = None
       # store previous step size (unless it was a SamePoint run!)
-      if stepSize > 0:
-        self._stepHistory[traj].append(stepSize)
+      # if stepSize > 0:
+      # TODO is this the best way to do this?
+      # update the step history with the full suggested step size, NOT the step size
+      # that came as a result of the boundary modifications
+      self._stepHistory[traj].append(stepSize)
       # start new step
       self._initializeStep(traj)
       self.raiseADebug('Taking step {} for traj {} ...'.format(self._stepCounter[traj], traj))
       self.raiseADebug(' ... gradient magn: {:1.2e} direction: {}'.format(gradMag, gradVersor))
-      self.raiseADebug(' ... normalized step size: {}'.format(stepSize))
+      self.raiseADebug(' ... normalized desired step size: {}'.format(stepSize))
+      self.raiseADebug(' ... normalized actual  step size: {}'.format(modStepSize))
       # TODO denorm calcs could potentially be expensive, maybe not worth running
       ## initial tests show it's not a big deal for small systems
       self.raiseADebug(' ... current opt point:', self.denormalizeData(opt))
@@ -444,38 +459,25 @@ class GradientDescent(Sampled):
     info = {'minStepSize': self._convergenceCriteria.get('stepSize', 1e-10)} # TODO why 1e-10?
     tries = 500
     while not passFuncs:
-      # DEBUGG
       modded = True
-      import matplotlib.pyplot as plt
-      import matplotlib
-      matplotlib.use('Qt5Agg')
-      fig, ax = plt.subplots(figsize=(12,10))
-      xs, ys, ms = [], [], []
-      x, y = suggested['x'], suggested['y']
-      xs.append(x)
-      ys.append(y)
-      ms.append('$0$')
-      for i, x in enumerate(xs):
-        ax.plot(x, ys[i], marker=ms[i])
       #  try to find new acceptable point
       denormed = self.denormalizeData(suggested)
-      # DEBUGG XXX FIXME TODO remove
-      rlz = {'trajID': 0,
-             'x': denormed['x'],
-             'y': denormed['y'],
-             'ans': 1 - tries / 100,
-             'stepSize': 9999,
-             'iteration': 9999,
-             'accepted': 'search',
-             'conv_gradient': 0,
-            }
-      rlz = dict((key, np.atleast_1d(val)) for key, val in rlz.items())
-      self._solutionExport.addRealization(rlz)
-      print('DEBUGG subtry:', rlz['ans'])
-      suggested, stepSize, info = self._stepInstance.fixConstraintViolations(suggested, previous, info, ax)
-      #plt.show()
+      ### DEBUGG the following lines will add constraint search attempts to the solution export.
+      # rlz = {'trajID': 0,
+      #        'x': denormed['x'],
+      #        'y': denormed['y'],
+      #        'ans': 1 - tries / 100,
+      #        'stepSize': 9999,
+      #        'iteration': 9999,
+      #        'accepted': 'search',
+      #        'conv_gradient': 0,
+      #       }
+      # rlz = dict((key, np.atleast_1d(val)) for key, val in rlz.items())
+      # self._solutionExport.addRealization(rlz)
+      ### END DEBUGG
+      suggested, modStepSize, info = self._stepInstance.fixConstraintViolations(suggested, previous, info)
       denormed = self.denormalizeData(suggested)
-      self.raiseADebug(' ... suggested norm step {:1.2e}, new opt {}'.format(stepSize, denormed))
+      self.raiseADebug(' ... suggested norm step {:1.2e}, new opt {}'.format(modStepSize, denormed))
       passFuncs = self._checkFunctionalConstraints(denormed)
       tries -= 1
       if tries == 0:

@@ -42,9 +42,9 @@ def constrain(raven):
   x = raven.x
   y = raven.y
   # circle
-  # res = np.sqrt(x**2 + y**2)
-  # if res <= 0.2:
-  #   return False
+  res = np.sqrt(x**2 + y**2)
+  if res <= 0.2:
+    return False
   # rectangle
   if 0.25 < x < 0.75 and 0 < y < 1:
     return False

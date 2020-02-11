@@ -30,6 +30,7 @@ import numpy as np
 from utils import utils, InputData, InputTypes
 #Internal Modules End--------------------------------------------------------------------------------
 
+
 class StepManipulator(utils.metaclass_insert(abc.ABCMeta, object)):
   """
     Base class for handling step sizing in optimization paths

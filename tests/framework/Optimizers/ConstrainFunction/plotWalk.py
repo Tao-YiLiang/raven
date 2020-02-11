@@ -14,8 +14,8 @@ import numpy as np
 bX,bY,bZ = pk.load(open('offset_parabola_plotdata.pk','rb'))
 fig = plt.figure()
 ax = fig.add_subplot(111)
-norm = colors.Normalize(vmin=1e-6,vmax=1e0)
-#norm = colors.LogNorm(vmin=1e-8,vmax=2e0)
+#norm = colors.Normalize(vmin=1e-6,vmax=1e0)
+norm = colors.LogNorm(vmin=1e-4,vmax=2e0)
 im = ax.pcolormesh(bX,bY,bZ,norm=norm, cmap='gray')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -53,6 +53,7 @@ for c,case in enumerate(cases):
 import matplotlib.patches as mpatches
 circ = mpatches.Circle((0,0), 0.2, fill=False, color='y')
 ax.add_artist(circ)
+ax.plot([0.25, 0.75, 0.75, 0.25, 0.25], [0, 0, 1, 1, 0], 'k-')
 
 # point the first dot
 points = []
