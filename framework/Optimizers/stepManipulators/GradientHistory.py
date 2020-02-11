@@ -67,6 +67,8 @@ class GradientHistory(StepManipulator):
     self._optVars = None
     self._growth = 1.25
     self._shrink = 1.15
+    self._minRotationAngle = 2.0 # how close to perpendicular should we try rotating towards?
+    self._numRandomPerp = 3      # how many random perpendiculars should we try rotating towards?
     # __private
     # additional methods
 
@@ -131,6 +133,11 @@ class GradientHistory(StepManipulator):
       @ Out, stepSize, new step size taken # TODO need?
       @ Out, fixInfo, updated fixing info
     """
+    # DESIGN
+    # While not okay:
+    # 1. See if cutting the step will fix it.
+    # 2. If not, try rotating towards a random perpendicular. Repeat 1.
+    # 3. If not, try a new random perpendicular. Repeat 1. Repeat N times.
     # TODO should this be specific to step manipulators, or something else?
     # TODO updating opt point in place! Is this safe?
     minStepSize = fixInfo['minStepSize']
@@ -169,25 +176,35 @@ class GradientHistory(StepManipulator):
     else:
       ### rotate vector and restore full step size
       stepSize = fixInfo['originalStepSize']
-      ##### METHOD ONE: pick perpendicular and keep it
       # store original direction
       if 'originalDirection' not in fixInfo:
-        fixInfo['originalDirection'] = stepDirection
+        fixInfo['originalDirection'] = np.atleast_1d(stepDirection)
+      # if this isn't the first time, check if there's angle left to rotate through; reset if not
+      if 'perpDir' in fixInfo:
+        ang = mathUtils.angleBetweenVectors(stepDirection, fixInfo['perpDir'])
+        print('DEBUGG current angle:', ang)
+        if ang < self._minRotationAngle:
+          del fixInfo['perpDir']
+
+      if 'perpDir' not in fixInfo:
         # find perpendicular vector
-        perp = randomUtils.randomPerpendicularVector(np.array(stepDirection))
+        perp = randomUtils.randomPerpendicularVector(fixInfo['originalDirection'])
         # NOTE we could return to point format, but no reason to
         # normalize perpendicular to versor and resize
+        rotations = fixInfo.get('numRotations', 0)
+        if rotations > self._numRandomPerp:
+          raise IndexError # TODO use a custom error!
         _, perpDir, _ = mathUtils.calculateMagnitudeAndVersor(perp)
         ax.arrow(previous['x'], previous['y'],
                 stepSize*perpDir[0], stepSize*perpDir[1],
                 color='k', ls=':', alpha=0.5, length_includes_head=True, width=stepSize/5)
         fixInfo['perpDir'] = perpDir
-      ### rotate vector halfway towards perpendicular
+        fixInfo['numRotations'] = rotations + 1
+      # END fixing perpendicular direction
+      # rotate vector halfway towards perpendicular
       perpDir = fixInfo['perpDir']
 
-      ###### METHOD TWO: repick perpendicular each time
-
-      # rotate
+      # rotate towards selected perpendicular
       splitVector = {} # vector that evenly divides stepDirection and perp
       for v, var in enumerate(self._optVars):
         splitVector[var] = stepDirection[v] + perpDir[v]

@@ -447,6 +447,8 @@ class GradientDescent(Sampled):
       # DEBUGG
       modded = True
       import matplotlib.pyplot as plt
+      import matplotlib
+      matplotlib.use('Qt5Agg')
       fig, ax = plt.subplots(figsize=(12,10))
       xs, ys, ms = [], [], []
       x, y = suggested['x'], suggested['y']
@@ -471,7 +473,7 @@ class GradientDescent(Sampled):
       self._solutionExport.addRealization(rlz)
       print('DEBUGG subtry:', rlz['ans'])
       suggested, stepSize, info = self._stepInstance.fixConstraintViolations(suggested, previous, info, ax)
-      plt.show()
+      #plt.show()
       denormed = self.denormalizeData(suggested)
       self.raiseADebug(' ... suggested norm step {:1.2e}, new opt {}'.format(stepSize, denormed))
       passFuncs = self._checkFunctionalConstraints(denormed)

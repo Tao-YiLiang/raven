@@ -55,12 +55,13 @@ for c,case in enumerate(cases):
         a = line[ia]
         if a in ['first', 'accepted']:
           m = '${}$'.format(i)
+          accepted = i
         elif a == 'search':
-          m = '$s$'
+          m = '$s{}$'.format(accepted)
         elif a == 'rerun':
           m = '.'
         elif a == 'rejected':
-          m = 'x'
+          m = 'x{}'.format(accepted)
         else:
           print(a)
           raise NotImplementedError

@@ -333,6 +333,7 @@ def randomPerpendicularVector(vector):
   nonZeroMap = vector != 0
   # choose a random NONZERO index to be dependent (don't divide by zero, mate)
   depIndex = indices[nonZeroMap][randomIntegers(0, numNonZero - 1, None)]
+  print('DEBUGG index:', depIndex, type(vector))
   print('DEBUGG index, val:', depIndex, vector[depIndex])
   # random values for all but chosen variable
   perp = randomNormal(N)
