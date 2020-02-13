@@ -207,10 +207,16 @@ class GradientHistory(StepManipulator):
       @ In, kwargs, dict, keyword-based specifics as required by individual step sizers
       @ Out, stepSize, float, new step size
     """
-    grad0 = gradientHist[-1][1]
-    grad1 = gradientHist[-2][1] if len(gradientHist) > 1 else None
-    gainFactor = self._fractionalStepChange(grad0, grad1, recommend=recommend)
-    stepSize = gainFactor * prevStepSize[-1]
+    # grad0 = gradientHist[-1][1]
+    # grad1 = gradientHist[-2][1] if len(gradientHist) > 1 else None
+    # FIXME try using the step directions instead
+    step0 = prevStepSize[-1]['versor']
+    if step0 is None:
+      step0 = gradientHist[-1][1]
+    step1 = prevStepSize[-2]['versor'] if len(prevStepSize) > 1 else None
+    gainFactor = self._fractionalStepChange(step0, step1, recommend=recommend)
+    # gainFactor = self._fractionalStepChange(grad0, grad1, recommend=recommend)
+    stepSize = gainFactor * prevStepSize[-1]['magnitude']
     return stepSize
 
   def _fractionalStepChange(self, grad0, grad1, recommend=None):
@@ -235,7 +241,8 @@ class GradientHistory(StepManipulator):
       return 1.0
     # otherwise, figure it out based on the gradient history
     # scalar product
-    prod = np.sum([np.sum(grad0[v] * grad1[v]) for v in grad0.keys()])
+    prod = np.dot(grad0, grad1)
+    # prod = np.sum([np.sum(grad0 * grad1) for v in grad0.keys()])
     if prod > 0:
       factor = self._growth ** prod
     else:
