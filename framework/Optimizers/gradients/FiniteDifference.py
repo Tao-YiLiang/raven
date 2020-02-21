@@ -16,12 +16,16 @@
 """
 import abc
 import copy
+import pandas as pd
+import time
 
 import numpy as np
 
 from utils import InputData, InputTypes, randomUtils, mathUtils
 
 from .GradientApproximater import GradientApproximater
+
+#from .CentralDifference import CentralDifference
 
 class FiniteDifference(GradientApproximater):
   """
@@ -68,26 +72,47 @@ class FiniteDifference(GradientApproximater):
       @ Out, direction, dict, versor (unit vector) for gradient direction
     """
     gradient = {}
+    A=[]
+    #print("This is grads",grads[0].keys())
+    #print("This is opt",opt)
+    #aaa
     for g, pt in enumerate(grads):
+      x, y= enumerate(grads)
+
       info = infos[g]
       delta = info['delta']
       activeVar = info['optVar']
-      lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(pt[objVar], opt[objVar]))
-      #if delta != 0:
-      grad = (lossDiff) / delta
-      #else:
-      #  grad = 0
+
+
+      #CentralDifference.derivative(pt[objVar],opt[objVar],g,delta,grads,objVar,infos)
+
+
+      grad = self.derivative(pt[objVar],opt[objVar],delta,grads,objVar,infos)
+
+
+  
       gradient[activeVar] = grad
     # get the magnitude, versor of the gradient
+  
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
     return magnitude, direction, foundInf
+
+  def derivative(self, x,y, delta,grads,objVar,infos):
+    
+    lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(x,y))
+
+    return lossDiff/delta
+
+
+
 
   def numGradPoints(self):
     """
       Returns the number of grad points required for the method
     """
     return self.N
+
 
   ###################
   # Utility Methods #

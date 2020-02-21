@@ -20,7 +20,7 @@ from __future__ import division, print_function, unicode_literals, absolute_impo
 ################################################################################
 from .GradientApproximater import GradientApproximater
 from .FiniteDifference import FiniteDifference
-#from .CentralDifference import CentralDifference
+from .CentralDifference import CentralDifference
 #from .SPSA import SPSA
 
 
@@ -33,7 +33,7 @@ from .FiniteDifference import FiniteDifference
 __base = 'Optimizer'
 __interFaceDict = {}
 __interFaceDict['FiniteDifference'] = FiniteDifference
-#__interFaceDict['CentralDifference'] = CentralDifference
+__interFaceDict['CentralDifference'] = CentralDifference
 #__interFaceDict['SPSA'] = SPSA
 
 __knownTypes = list(__interFaceDict.keys())
