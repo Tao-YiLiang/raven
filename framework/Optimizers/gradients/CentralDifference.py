@@ -25,6 +25,8 @@ class CentralDifference(FiniteDifference):
       if delta1<0:
         delta1 =-1*delta1
 
+      central = (-3*grads[0][objVar] + 4*opt[objVar] - grads[1][objVar])/(delta0+delta1)
+
       central = (mathUtils.diffWithInfinites(grads[0][objVar],grads[1][objVar]))/(delta0+delta1)
       self.i+=1
       return central
