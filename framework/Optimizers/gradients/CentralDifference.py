@@ -17,7 +17,7 @@ class CentralDifference(FiniteDifference):
       delta0 = infos[0]['delta']
       delta1 = infos[1]['delta']
       if self.i == 10:
-        print("This is infos",infos[0], infos[1],grads[0][objVar],grads[1][objVar])
+        #print("This is infos",infos[0], infos[1],grads[0][objVar],grads[1][objVar])
         #aaa
       
       if delta0 <0:
