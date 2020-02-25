@@ -59,6 +59,8 @@ class FiniteDifference(GradientApproximater):
       evalInfo.append({'type': 'grad',
                        'optVar': optVar,
                        'delta': delta})
+
+
     return evalPoints, evalInfo
 
   def evaluate(self, opt, grads, infos, objVar):
@@ -76,6 +78,7 @@ class FiniteDifference(GradientApproximater):
     #print("This is grads",grads[0].keys())
     #print("This is opt",opt)
     #aaa
+    #print("These are")
     for g, pt in enumerate(grads):
       x, y= enumerate(grads)
 
@@ -111,10 +114,10 @@ class FiniteDifference(GradientApproximater):
     """
       Returns the number of grad points required for the method
     """
+    print("This is me calling",self.N)
     return self.N
 
 
   ###################
   # Utility Methods #
   ###################
-
