@@ -94,6 +94,7 @@ class StepManipulator(utils.metaclass_insert(abc.ABCMeta, object)):
       @ In, kwargs, dict, keyword-based specifics as required by individual step sizers
       @ Out, newOpt, dict, new optimal point
       @ Out, stepSize, float, new step size
+      @ Out, stepInfo, dict, additional information about this step to store
     """
 
   @abc.abstractmethod

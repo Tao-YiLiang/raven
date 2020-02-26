@@ -168,7 +168,7 @@ class GradientDescent(Sampled):
     self._gradProximity = 0.01     # TODO user input, the proximity for gradient evaluations
     # history trackers, by traj, are deques (-1 is most recent)
     self._gradHistory = {}         # gradients
-    self._stepHistory = {}         # {'magnitude': size, 'versor': direction} for step
+    self._stepHistory = {}         # {'magnitude': size, 'versor': direction, 'info': dict} for step
     self._acceptHistory = {}       # acceptability
     self._stepRecommendations = {} # by traj, if a 'cut' or 'grow' is recommended else None
     self._acceptRerun = {}         # by traj, if True then override accept for point rerun
@@ -248,7 +248,7 @@ class GradientDescent(Sampled):
     # queue up the first run for each trajectory
     initialStepSize = self._stepInstance.initialStepSize(len(self.toBeSampled)) # TODO user scaling option
     for traj, init in enumerate(self._initialValues):
-      self._stepHistory[traj].append({'magnitude': initialStepSize, 'versor': None}) # None is the direction, we don't know it yet
+      self._stepHistory[traj].append({'magnitude': initialStepSize, 'versor': None, 'info': None})
       self._submitOptAndGrads(init, traj, 0, initialStepSize)
 
   ###############
@@ -307,7 +307,7 @@ class GradientDescent(Sampled):
       self.raiseADebug(' ... gradient calculated ...')
       self._gradHistory[traj].append((gradMag, gradVersor))
       # get new step information
-      newOpt, stepSize = self._stepInstance.step(opt, gradientHist=self._gradHistory[traj],
+      newOpt, stepSize, stepInfo = self._stepInstance.step(opt, gradientHist=self._gradHistory[traj],
                                                  prevStepSize=self._stepHistory[traj],
                                                  recommend=self._stepRecommendations[traj])
       self.raiseADebug(' ... found new proposed opt point ...')
@@ -325,31 +325,12 @@ class GradientDescent(Sampled):
       # update values if modified by constraint handling
       deltas = dict((var, suggested[var] - opt[var]) for var in self.toBeSampled)
       actualStepSize, stepVersor, _ = mathUtils.calculateMagnitudeAndVersor(np.array(list(deltas.values())))
-      # FIXME OLD stepVersor = dict((var, stepVersor[v]) for v, var in enumerate(self.toBeSampled))
-      # if not modded:
-      #   # no modifications, so we took the actual step size in the direction given
-      #   # modStepSize = stepSize
-      #   # stepVersor = gradVersor
-      #   pass
-      # else:
-      #   # update the step size and suggested new opt point
-      #   deltas = dict((var, suggested[var] - opt[var]) for var in self.toBeSampled)
-      #   # TODO how do we use this modded step size?
-      #   modStepSize, stepVersor, _ = mathUtils.calculateMagnitudeAndVersor(np.array(list(deltas.values())))
-      #   # FIXME OLD modStepSize = mathUtils.calculateMultivectorMagnitude(np.array(list(deltas.values())))
-      #   newOpt = suggested
-      #   # TODO what if suggested point ends up being the same as the previous point?
-      #   # If true and if 1 away from persistence convergence, then we could technically quit here!
-      #   # Maybe someday.
 
-      # clear recommendations on step size, since we took the recommendation by now
+      # erase recommendations on step size, since we took the recommendation by now
       self._stepRecommendations[traj] = None
-      # store previous step size (unless it was a SamePoint run!)
-      # if stepSize > 0:
-      # TODO is this the best way to do this?
       # update the step history with the full suggested step size, NOT the actually-used step size
       # that came as a result of the boundary modifications
-      self._stepHistory[traj].append({'magnitude': stepSize, 'versor': stepVersor})
+      self._stepHistory[traj].append({'magnitude': stepSize, 'versor': stepVersor, 'info': stepInfo})
       # start new step
       self._initializeStep(traj)
       self.raiseADebug('Taking step {} for traj {} ...'.format(self._stepCounter[traj], traj))
