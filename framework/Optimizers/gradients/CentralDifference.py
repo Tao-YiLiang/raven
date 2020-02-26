@@ -9,6 +9,7 @@ from utils import InputData, InputTypes, randomUtils, mathUtils
 from .GradientApproximater import GradientApproximater
 
 from .FiniteDifference import FiniteDifference
+"Author:--"
 
 class CentralDifference(GradientApproximater):
   
