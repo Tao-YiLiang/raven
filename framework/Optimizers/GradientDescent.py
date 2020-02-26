@@ -305,7 +305,6 @@ class GradientDescent(Sampled):
                                                                grads, gradInfos,
                                                                self._objectiveVar)
 
-      print("This is gradMag, gradVersor")
       self.raiseADebug(' ... gradient calculated ...')
       self._gradHistory[traj].append((gradMag, gradVersor))
       # get new step information
@@ -377,17 +376,15 @@ class GradientDescent(Sampled):
     """
     # need to make sure opt point, grad points are all present
     tracker = self._stepTracker[traj]
-    #print(" This is tracker",tracker)
+    
   
     if tracker['opt'] is None:
-      #print("This is tracker",tracker['opt'])
+      
       return False
     if len(tracker['grads']) < self._gradientInstance.numGradPoints():
-      print("This is Gradient descent",self._gradientInstance.numGradPoints(),len(tracker['grads']))
-      #aaa
+      
       return False
-    print("This is what I want to know",len(tracker['grads']),self._gradientInstance.numGradPoints())
-    #aaaa
+    
     return True
 
   def _initializeStep(self, traj):
@@ -425,7 +422,7 @@ class GradientDescent(Sampled):
       @ In, rlz, dict, realized realization
       @ In, optVal, float, value of objective variable (corrected for min/max)
     """
-    #print("This is rlz", rlz)
+
     self._stepTracker[traj]['grads'].append((rlz, info))
 
   # * * * * * * * * * * * * * * * *
