@@ -48,19 +48,29 @@ class FiniteDifference(GradientApproximater):
     dh = self._proximity * stepSize
     evalPoints = []
     evalInfo = []
+    print("This is the optVar",self._optVars)
+    #aaa
 
     directions = np.asarray(randomUtils.random(self.N) < 0.5) * 2 - 1
     for o, optVar in enumerate(self._optVars):
+
+     
+
+ 
       optValue = opt[optVar]
       new = copy.deepcopy(opt)
+
+  
       delta = dh * directions[o]
       new[optVar] = optValue + delta
+
+      
       evalPoints.append(new)
       evalInfo.append({'type': 'grad',
                        'optVar': optVar,
                        'delta': delta})
 
-
+ 
     return evalPoints, evalInfo
 
   def evaluate(self, opt, grads, infos, objVar):
@@ -73,39 +83,39 @@ class FiniteDifference(GradientApproximater):
       @ Out, magnitude, float, magnitude of gradient
       @ Out, direction, dict, versor (unit vector) for gradient direction
     """
+
     gradient = {}
-    A=[]
-    #print("This is grads",grads[0].keys())
-    #print("This is opt",opt)
-    #aaa
-    #print("These are")
+
+    print("What the hell is grads", grads)
+    #aa
+    
+
     for g, pt in enumerate(grads):
-      x, y= enumerate(grads)
+
+      print("This is grads",grads)
+      aaaa
+
+      
 
       info = infos[g]
       delta = info['delta']
       activeVar = info['optVar']
 
 
-      #CentralDifference.derivative(pt[objVar],opt[objVar],g,delta,grads,objVar,infos)
+      lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(pt[objVar],opt[objVar]))
 
-
-      grad = self.derivative(pt[objVar],opt[objVar],delta,grads,objVar,infos)
+      grad = lossDiff/delta
 
 
   
       gradient[activeVar] = grad
-    # get the magnitude, versor of the gradient
+  
   
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
     return magnitude, direction, foundInf
 
-  def derivative(self, x,y, delta,grads,objVar,infos):
-    
-    lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(x,y))
 
-    return lossDiff/delta
 
 
 
@@ -114,7 +124,6 @@ class FiniteDifference(GradientApproximater):
     """
       Returns the number of grad points required for the method
     """
-    print("This is me calling",self.N)
     return self.N
 
 

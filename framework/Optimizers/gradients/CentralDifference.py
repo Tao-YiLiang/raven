@@ -10,9 +10,8 @@ from .GradientApproximater import GradientApproximater
 
 from .FiniteDifference import FiniteDifference
 
-class CentralDifference(FiniteDifference):
+class CentralDifference(GradientApproximater):
   
-  #i=0
   def chooseEvaluationPoints(self, opt, stepSize):
     """
       Determines new point(s) needed to evaluate gradient
@@ -27,40 +26,73 @@ class CentralDifference(FiniteDifference):
 
 
     for o, optVar in enumerate(self._optVars):
+
  
       optValue = opt[optVar]
       new = copy.deepcopy(opt)
-      delta = dh #* directions[o]
+      new2 = copy.deepcopy(opt)
+      delta = dh 
 
       new[optVar] = optValue + delta
+      new2[optVar] = optValue - delta
+
       evalPoints.append(new)
+      evalPoints.append(new2)
       evalInfo.append({'type': 'grad',
                        'optVar': optVar,
                        'delta': delta})
-      print("This is evalpoints cdf",evalPoints)
+
+      evalInfo.append({'type': 'grad',
+                       'optVar': optVar,
+                       'delta': delta})
+
+    
+      
     return evalPoints, evalInfo
 
-  def derivative(self, x,y, delta,grads,objVar,infos):
-    #print("This is self.N",self.N)
-  
-    delta0 = infos[0]['delta']
-    delta1 = infos[1]['delta']
-        
-    #lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(x,y))
-    central = (-3*grads[0][objVar] + 4*y - grads[1][objVar])/(delta0+delta1)
-    #central = (mathUtils.diffWithInfinites(grads[0][objVar],grads[1][objVar]))/(delta0+delta1)
+  def evaluate(self, opt, grads, infos, objVar):
+    """
+      Approximates gradient based on evaluated points.
+      @ In, opt, dict, current opt point (normalized)
+      @ In, grads, list(dict), evaluated neighbor points
+      @ In, infos, list(dict), info about evaluated neighbor points
+      @ In, objVar, string, objective variable
+      @ Out, magnitude, float, magnitude of gradient
+      @ Out, direction, dict, versor (unit vector) for gradient direction
+    """
 
-    return central
+    gradient = {}
+
+    objective = np.zeros((len(grads)))
+    delta={}
+    for g, pt in enumerate(grads):
+      info = infos[g] 
+      activeVar = info['optVar']
+      delta[activeVar] = info['delta']
+
+
+    
+    
+    for i,var in enumerate(grads[0].keys()):
+
+      if var != objVar:
+
+        gradient[var] = (-3*grads[2*i+1][objVar]+4*opt[objVar]-grads[2*i][objVar])/(2*delta[var])
+    
+
+
+
+    
+    magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
+    direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
+    return magnitude, direction, foundInf
 
   def numGradPoints(self):
     """
       Returns the number of grad points required for the method
     """
-    #print("This is self.N",self.N*2)
-    
-    #aaa
-    #self.N+=self.N
-    return self.N
+
+    return self.N*2
   
   
 
