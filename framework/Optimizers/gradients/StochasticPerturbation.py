@@ -2,19 +2,22 @@ import abc
 import copy
 import pandas as pd
 import numpy as np
-import os 
+import os
 import sys
-raven_path= '/Users/gaira/Optimizers/raven/framework/utils/'
-sys.path.append(raven_path)
-from utils import InputData, InputTypes, randomUtils, mathUtils
-
-from utils import InputData, InputTypes, randomUtils, mathUtils
-
 from .GradientApproximater import GradientApproximater
+CWD = (os.getcwd())
+CWD = CWD +'/../../'
+sys.path.append(CWD)
+print("This is current",os.getcwd())
+from utils import InputData, InputTypes, randomUtils, mathUtils
+
+from utils import InputData, InputTypes, randomUtils, mathUtils
+
+
 
 "Author:--"
 
-class CentralDifference(GradientApproximater):
+class StochasticPerturbation(GradientApproximater):
   
   def chooseEvaluationPoints(self, opt, stepSize):
     """
@@ -97,6 +100,27 @@ class CentralDifference(GradientApproximater):
     """
 
     return self.N*2
+  
+
+class Test():
+
+    def Peturb(self, N):
+        A=randomUtils.randPointsOnHypersphere(N)
+
+        print(A)
+
+        return(A)
+
+
+B=Test()
+
+print(B.Peturb)
+
+
+
+
+
+    
   
   
 
