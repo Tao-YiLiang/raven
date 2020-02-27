@@ -46,17 +46,22 @@ class SPSA(GradientApproximater):
     self.c = dh
     self.ak = self.a/np.power(self.counter+self.A, self.alpha)
     self.ck=self.c/np.power(self.counter,self.gamma)
-    perturb = randomUtils.randPointsOnHypersphere(1)
+    perturb = randomUtils.randPointsOnHypersphere(2)
+ 
     
     
 
     evalPoints = []
     evalInfo = []
+
+    delta=[]
     
    
 
 
     for o, optVar in enumerate(self._optVars):
+
+      
       
 
    
@@ -71,12 +76,13 @@ class SPSA(GradientApproximater):
 
       
       
-      delta = self.ck*perturb
-      
+      delta.append( self.ck*perturb[o] )
     
-     
-      new[optVar] = optValue + self.ck*perturb
-      new2[optVar] = optValue - self.ck*perturb
+    
+      
+      new[optVar] = optValue + self.ck*perturb[o]
+      new2[optVar] = optValue - self.ck*perturb[o]
+   
    
 
       evalPoints.append(new)
@@ -107,7 +113,7 @@ class SPSA(GradientApproximater):
 
     gradient = {}
 
-   
+ 
     
 
     for i in range(0,len(grads),2):
@@ -116,10 +122,14 @@ class SPSA(GradientApproximater):
       
 
       info = infos[i]
-      delta = info['delta']
+
+      if i == 0:
+        delta = info['delta'][i]
+      if i == 2:
+        delta = info['delta'][i-1]
       activeVar = info['optVar']
 
-      
+    
 
       
       lossDiff = (grads[i][objVar]-grads[i+1][objVar])
@@ -135,7 +145,9 @@ class SPSA(GradientApproximater):
   
   
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
+
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
+
     return magnitude, direction, foundInf
 
   def numGradPoints(self):
