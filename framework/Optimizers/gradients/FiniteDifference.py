@@ -48,7 +48,8 @@ class FiniteDifference(GradientApproximater):
     dh = self._proximity * stepSize
     evalPoints = []
     evalInfo = []
-    
+    #print("HAHAHAH",randomUtils.randPointsOnHypersphere(10))
+    #aaa
 
     directions = np.asarray(randomUtils.random(self.N) < 0.5) * 2 - 1
     for o, optVar in enumerate(self._optVars):
@@ -85,7 +86,8 @@ class FiniteDifference(GradientApproximater):
 
     gradient = {}
 
-   
+    print("These are the grads", grads)
+    aaa
     
 
     for g, pt in enumerate(grads):
