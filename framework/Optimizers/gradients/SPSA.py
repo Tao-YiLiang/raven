@@ -11,11 +11,7 @@ from utils import InputData, InputTypes, randomUtils, mathUtils
 
 from utils import InputData, InputTypes, randomUtils, mathUtils
 
-
-
 "Author: gairabhi"
-
-
 
 class SPSA(GradientApproximater):
 
