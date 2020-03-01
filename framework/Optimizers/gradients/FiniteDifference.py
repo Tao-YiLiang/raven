@@ -25,8 +25,6 @@ from utils import InputData, InputTypes, randomUtils, mathUtils
 
 from .GradientApproximater import GradientApproximater
 
-#from .CentralDifference import CentralDifference
-
 class FiniteDifference(GradientApproximater):
   """
     Uses FiniteDifference approach to approximating gradients

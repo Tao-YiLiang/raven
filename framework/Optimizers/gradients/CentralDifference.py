@@ -4,15 +4,13 @@ import pandas as pd
 import numpy as np
 import os 
 import sys
-raven_path= '/Users/gaira/Optimizers/raven/framework/utils/'
-sys.path.append(raven_path)
 from utils import InputData, InputTypes, randomUtils, mathUtils
 
 from utils import InputData, InputTypes, randomUtils, mathUtils
 
 from .GradientApproximater import GradientApproximater
 
-"Author:--"
+"Author:--gairabhi"
 
 class CentralDifference(GradientApproximater):
   
@@ -82,10 +80,6 @@ class CentralDifference(GradientApproximater):
       if var != objVar:
 
         gradient[var] = (-3*grads[2*i+1][objVar]+4*opt[objVar]-grads[2*i][objVar])/(2*delta[var])
-    
-
-
-
     
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
