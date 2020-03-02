@@ -228,7 +228,10 @@ class Sampled(Optimizer):
     # TODO making a new dict might be costly, maybe worth just passing whole point?
     ## testing suggests no big deal on smaller problem
     rlz = dict((var, full[var]) for var in (list(self.toBeSampled.keys()) + [self._objectiveVar] + list(self.dependentSample.keys())))
+    # the sign of the objective function is flipped by collectOptValue in the event we're doing
+    # maximization, so get the correct-signed value and replace it in the realization
     optVal = self._collectOptValue(rlz)
+    rlz[self._objectiveVar] = optVal
     rlz = self.normalizeData(rlz)
     self._useRealization(info, rlz, optVal)
 
@@ -323,7 +326,7 @@ class Sampled(Optimizer):
     # decide what to do next
     if acceptable in ['accepted', 'first']:
       # record history
-      self._optPointHistory[traj].append((rlz, info))
+      self.optPointHistory[traj].append((rlz, info))
       # nothing else to do but wait for the grad points to be collected
     elif acceptable == 'rejected':
       self._rejectOptPoint(traj, info, old)

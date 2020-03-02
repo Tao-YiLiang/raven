@@ -552,7 +552,7 @@ class GradientDescent(Sampled):
 
     try:
       old, _ = self._optPointHistory[traj][-1]
-      oldVal = self._collectOptValue(old)
+      oldVal = old[self._objectiveVar] # DO NOT call collectOptValue here, since stored sign is already flipped! self._collectOptValue(old)
       ## some stepManipulators may need to override the acceptance criteria
       if self._stepInstance.needsAccessToAcceptance:
         acceptable = self._stepInstance.modifyAcceptance(old, oldVal, opt, optVal)
@@ -749,7 +749,7 @@ class GradientDescent(Sampled):
       return False
     o1, _ = self._optPointHistory[traj][-1]
     o2, _ = self._optPointHistory[traj][-2]
-    delta = mathUtils.relativeDiff(self._collectOptValue(o2), self._collectOptValue(o1))
+    delta = mathUtils.relativeDiff(o2[self._objectiveVar], o1[self._objectiveVar])
     converged = abs(delta) < self._convergenceCriteria['objective']
     self.raiseADebug(self.convFormat.format(name='objective',
                                             conv=str(converged),

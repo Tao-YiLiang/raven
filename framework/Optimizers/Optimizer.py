@@ -345,9 +345,6 @@ class Optimizer(AdaptiveSampler):
       # more API hacking
       # self._initSampler.counter += 1
 
-
-
-
   def initializeTrajectory(self, traj=None):
     """
       Sets up a new trajectory.
