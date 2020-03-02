@@ -14,15 +14,9 @@
 """
   Implementation of FiniteDifference gradient approximation
 """
-import abc
 import copy
-import pandas as pd
-import time
-
 import numpy as np
-
 from utils import InputData, InputTypes, randomUtils, mathUtils
-
 from .GradientApproximater import GradientApproximater
 
 class FiniteDifference(GradientApproximater):
@@ -49,24 +43,16 @@ class FiniteDifference(GradientApproximater):
 
     directions = np.asarray(randomUtils.random(self.N) < 0.5) * 2 - 1
     for o, optVar in enumerate(self._optVars):
-
-     
-
- 
       optValue = opt[optVar]
       new = copy.deepcopy(opt)
-
-  
       delta = dh * directions[o]
       new[optVar] = optValue + delta
-
-      
       evalPoints.append(new)
       evalInfo.append({'type': 'grad',
                        'optVar': optVar,
                        'delta': delta})
 
- 
+
     return evalPoints, evalInfo
 
   def evaluate(self, opt, grads, infos, objVar):
@@ -79,31 +65,15 @@ class FiniteDifference(GradientApproximater):
       @ Out, magnitude, float, magnitude of gradient
       @ Out, direction, dict, versor (unit vector) for gradient direction
     """
-
     gradient = {}
-
-
-    
-
     for g, pt in enumerate(grads):
-
-     
-      
-
       info = infos[g]
       delta = info['delta']
       activeVar = info['optVar']
-
-
-      lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(pt[objVar],opt[objVar]))
-
+      lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(pt[objVar], opt[objVar]))
       grad = lossDiff/delta
-
-
-  
       gradient[activeVar] = grad
-  
-  
+    # obtain the magnitude and versor of the gradient to return
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
     return magnitude, direction, foundInf
