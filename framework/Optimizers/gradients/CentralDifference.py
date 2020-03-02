@@ -61,7 +61,6 @@ class CentralDifference(GradientApproximater):
     """
 
     gradient = {}
-
     for i in range(len(grads)):
       for var in infos[i]['optVar']:
         for j in range(i+1,len(grads)):
@@ -72,8 +71,7 @@ class CentralDifference(GradientApproximater):
               backward,forward = i,j
             else:
               backward,forward = j,i
-            gradient[var] = (-3*grads[backward][objVar]+4*opt[objVar]-grads[forward][objVar])/(2*infos[i]['delta'])
-
+            gradient[var] = (-3*grads[backward][objVar]+4*opt[objVar]-grads[forward][objVar])/2/infos[i]['delta']
           else:
              continue
         

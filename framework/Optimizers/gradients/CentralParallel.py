@@ -1,34 +1,23 @@
-# Copyright 2017 Battelle Energy Alliance, LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""
-  Implementation of FiniteDifference gradient approximation
-"""
+import abc
 import copy
+import pandas as pd
 import numpy as np
+import os
+import sys
+raven_path= '/Users/gaira/Optimizers/raven/framework/utils/'
+sys.path.append(raven_path)
 from utils import InputData, InputTypes, randomUtils, mathUtils
+
+from utils import InputData, InputTypes, randomUtils, mathUtils
+
 from .GradientApproximater import GradientApproximater
 
-class FiniteDifference(GradientApproximater):
+"Author:--"
+
+class CentralDifference(GradientApproximater):
   """
-    Uses FiniteDifference approach to approximating gradients
+    Enables gradient estimation via central differencing
   """
-  ##########################
-  # Initialization Methods #
-  ##########################
-  ###############
-  # Run Methods #
-  ###############
   def chooseEvaluationPoints(self, opt, stepSize):
     """
       Determines new point(s) needed to evaluate gradient
@@ -41,23 +30,30 @@ class FiniteDifference(GradientApproximater):
     evalPoints = []
     evalInfo = []
 
-    directions = np.asarray(randomUtils.random(self.N) < 0.5) * 2 - 1
+
     for o, optVar in enumerate(self._optVars):
       optValue = opt[optVar]
-      new = copy.deepcopy(opt)
-      delta = dh * directions[o]
-      new[optVar] = optValue + delta
-      evalPoints.append(new)
+      neg = copy.deepcopy(opt)
+      pos = copy.deepcopy(opt)
+      delta = dh
+      neg[optVar] = optValue - delta
+      pos[optVar] = optValue + delta
+
+      evalPoints.append(neg)
+      evalInfo.append({'type': 'grad',
+                      'optVar': optVar,
+                      'delta': delta,
+                      'side': 'negative'})
+
+      evalPoints.append(pos)
       evalInfo.append({'type': 'grad',
                        'optVar': optVar,
                        'delta': delta})
-
-
     return evalPoints, evalInfo
 
   def evaluate(self, opt, grads, infos, objVar):
     """
-      Approximates gradient based on evaluated points.
+      Approximates gradient based on 2-point stencil central difference of evaluated points.
       @ In, opt, dict, current opt point (normalized)
       @ In, grads, list(dict), evaluated neighbor points
       @ In, infos, list(dict), info about evaluated neighbor points
@@ -66,26 +62,33 @@ class FiniteDifference(GradientApproximater):
       @ Out, direction, dict, versor (unit vector) for gradient direction
     """
     gradient = {}
-    for g, pt in enumerate(grads):
-      info = infos[g]
-      delta = info['delta']
-      activeVar = info['optVar']
-      lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(pt[objVar], opt[objVar]))
-      grad = lossDiff/delta
-      gradient[activeVar] = grad
-    # obtain the magnitude and versor of the gradient to return
+
+    for i in range(len(grads)):
+      for var in infos[i]['optVar']:
+        for j in range(i+1,len(grads)):
+          if infos[j]['optVar']==var:
+            pair = [grads[i][var],grads[j][var]]
+            ind = sorted(range(len(pair)), key=lambda k: pair[k])
+            if ind == sorted(ind):
+              backward,forward = i,j
+            else:
+              backward,forward = j,i
+            gradient[var] = (-3*grads[backward][objVar]+4*opt[objVar]-grads[forward][objVar])/(2*infos[i]['delta'])
+
+          else:
+             continue
+        
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
     return magnitude, direction, foundInf
-
 
   def numGradPoints(self):
     """
       Returns the number of grad points required for the method
     """
-    return self.N
+    return self.N*2
 
 
-  ###################
-  # Utility Methods #
-  ###################
+
+
+
