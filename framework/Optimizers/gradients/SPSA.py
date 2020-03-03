@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
+  Simultaneous Perturbation Stochastic Approximation gradient estimation algorithms
   Author: gairabhi
 """
 import numpy as np
@@ -55,11 +56,12 @@ class SPSA(GradientApproximater):
       @ Out, magnitude, float, magnitude of gradient
       @ Out, direction, dict, versor (unit vector) for gradient direction
     """
-    delta = infos[0]['delta']
     gradient = {}
     lossDiff = np.atleast_1d(mathUtils.diffWithInfinites(grads[0][objVar], opt[objVar]))
     for var in self._optVars:
-      gradient[var] = lossDiff / delta[var]
+      # don't assume delta is unchanged; calculate it here
+      delta = grads[0][var] - opt[var]
+      gradient[var] = lossDiff / delta
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
     return magnitude, direction, foundInf

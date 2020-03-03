@@ -299,7 +299,6 @@ class GradientDescent(Sampled):
       # get new gradient
       self.raiseADebug('Opt point accepted and gradient points collected, searching new opt point ...')
       opt, _ = self._stepTracker[traj]['opt']
-      print('DEBUGG starting from opt point:', self.denormalizeData(opt))
       grads, gradInfos = zip(*self._stepTracker[traj]['grads'])
       gradMag, gradVersor, _ = self._gradientInstance.evaluate(opt,
                                                                grads, gradInfos,
@@ -311,8 +310,6 @@ class GradientDescent(Sampled):
                                                  prevStepSize=self._stepHistory[traj],
                                                  recommend=self._stepRecommendations[traj])
       self.raiseADebug(' ... found new proposed opt point ...')
-      print('DEBUGG ... ... normed stepSize:', stepSize)
-      print('DEBUGG ... ... proposed:', self.denormalizeData(newOpt))
       # check new opt point against constraints
       try:
         suggested, modded = self._handleExplicitConstraints(newOpt, opt, 'opt')

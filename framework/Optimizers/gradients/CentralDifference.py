@@ -1,16 +1,12 @@
-import abc
+"""
+  Central difference approximation algorithms
+  Author:--gairabhi
+"""
 import copy
-import pandas as pd
-import numpy as np
-import os
-import sys
-from utils import InputData, InputTypes, randomUtils, mathUtils
-
-from utils import InputData, InputTypes, randomUtils, mathUtils
+from utils import mathUtils
 
 from .GradientApproximater import GradientApproximater
 
-"Author:--gairabhi"
 
 class CentralDifference(GradientApproximater):
   """
@@ -60,14 +56,27 @@ class CentralDifference(GradientApproximater):
       @ Out, direction, dict, versor (unit vector) for gradient direction
     """
     gradient = {}
-    delta = {}
-    for g, pt in enumerate(grads):
-      info = infos[g]
-      activeVar = info['optVar']
-      delta[activeVar] = info['delta']
-    for i, var in enumerate(self._optVars):
-      # TODO fix this for parallel-safe indexing (using 'optVar' and 'side' from infos)
-      gradient[var] = (-3 * grads[2*i+1][objVar] + 4 * opt[objVar] - grads[2*i][objVar]) / (2 * delta[var])
+    for v, var in enumerate(self._optVars):
+      # get the positive and negative sides for this var
+      neg = None
+      pos = None
+      # TODO this search could get expensive in high dimensions!
+      for g, grad in enumerate(grads):
+        info = infos[g]
+        if info['optVar'] == var:
+          if info['side'] == 'negative':
+            neg = grad
+          else:
+            pos = grad
+          if neg and pos:
+            break
+      # dh for pos and neg (note we don't assume delta was unchanged, we recalculate it)
+      dhNeg = opt[var] - neg[var]
+      dhPos = pos[var] - opt[var]
+      # 3-point central difference doesn't use opt point, since it cancels out
+      # also the terms are weighted by the dh on each side
+      gradient[var] = 1/(2*dhNeg) * pos[objVar] - 1/(2*dhPos) * neg[objVar]
+
     magnitude, direction, foundInf = mathUtils.calculateMagnitudeAndVersor(list(gradient.values()))
     direction = dict((var, float(direction[v])) for v, var in enumerate(gradient.keys()))
     return magnitude, direction, foundInf
@@ -76,4 +85,4 @@ class CentralDifference(GradientApproximater):
     """
       Returns the number of grad points required for the method
     """
-    return self.N*2
+    return self.N * 2
