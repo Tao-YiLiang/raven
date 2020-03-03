@@ -527,7 +527,7 @@ class GradientDescent(Sampled):
                  'purpose': purpose,
                 })
     # NOTE: explicit constraints have been checked before this!
-    self.raiseADebug('Adding run to queue: {} | {}'.format(point, info))
+    self.raiseADebug('Adding run to queue: {} | {}'.format(self.denormalizeData(point), info))
     #for key, inf in info.items():
     #  self.raiseADebug(' ... {}: {}'.format(key, inf))
     #self.raiseADebug(' ... {}: {}'.format('point', point))

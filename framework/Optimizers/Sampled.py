@@ -326,7 +326,7 @@ class Sampled(Optimizer):
     # decide what to do next
     if acceptable in ['accepted', 'first']:
       # record history
-      self.optPointHistory[traj].append((rlz, info))
+      self._optPointHistory[traj].append((rlz, info))
       # nothing else to do but wait for the grad points to be collected
     elif acceptable == 'rejected':
       self._rejectOptPoint(traj, info, old)
