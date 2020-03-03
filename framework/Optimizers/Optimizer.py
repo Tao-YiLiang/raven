@@ -268,6 +268,16 @@ class Optimizer(AdaptiveSampler):
       @ Out, convergence, bool, variable indicating whether the convergence criteria has been met.
     """
 
+  @abc.abstractmethod
+  def _updateSolutionExport(self, traj, rlz, acceptable):
+    """
+      Stores information to the solution export.
+      @ In, traj, int, trajectory which should be written
+      @ In, rlz, dict, collected point
+      @ In, acceptable, bool, acceptability of opt point
+      @ Out, None
+    """
+
   def _addTrackingInfo(self, info, **kwargs):
     """
       Creates realization identifiers to identifiy particular realizations as they return from the JobHandler.
