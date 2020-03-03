@@ -48,7 +48,6 @@
     [../]
   [../]
 
-
   [./ConstrainBoundary]
     type = 'RavenFramework'
     input = 'constrain_boundary.xml'
@@ -70,12 +69,24 @@
     [../]
   [../]
 
+
   [./CentralDiff]
     type = 'RavenFramework'
     input = 'central_diff.xml'
     [./data]
       type = OrderedCSV
       output = 'CentralDiff/opt_export_0.csv'
+      rel_err = 1e-3
+      zero_threshold = 1e-5
+    [../]
+  [../]
+
+  [./FDConjGrad]
+    type = 'RavenFramework'
+    input = 'fd_conjgrad.xml'
+    [./data]
+      type = OrderedCSV
+      output = 'FDConjGrad/opt_export_0.csv'
       rel_err = 1e-3
       zero_threshold = 1e-5
     [../]
