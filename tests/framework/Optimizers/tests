@@ -1,6 +1,17 @@
 [Tests]
-  [./Basic]
+  [./Minimal]
     #REQUIREMENT_TEST R-RM-1
+    type = 'RavenFramework'
+    input = 'minimal.xml'
+    [./data]
+      type = OrderedCSV
+      output = 'Minimal/opt_export_0.csv'
+      rel_err = 1e-3
+      zero_threshold = 1e-5
+    [../]
+  [../]
+
+  [./Basic]
     type = 'RavenFramework'
     input = 'basic.xml'
     [./data]
@@ -54,6 +65,15 @@
     [./data]
       type = OrderedCSV
       output = 'ConstrainBoundary/opt_export_0.csv'
+    [../]
+  [../]
+
+  [./ConstrainFunction]
+    type = 'RavenFramework'
+    input = 'constrain_function.xml'
+    [./data]
+      type = OrderedCSV
+      output = 'ConstrainFunction/opt_export_0.csv'
     [../]
   [../]
 

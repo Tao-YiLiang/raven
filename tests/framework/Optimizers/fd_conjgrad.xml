@@ -46,7 +46,7 @@
   <Optimizers>
     <GradientDescent name="opter">
       <samplerInit>
-        <limit>500</limit>
+        <limit>100</limit>
         <initialSeed>42</initialSeed>
         <writeSteps>every</writeSteps>
       </samplerInit>

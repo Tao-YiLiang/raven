@@ -16,7 +16,6 @@
       This test uses Beale's function, which is documented in the analytic tests documentation under
       the Optimizer functions section.
     </analytic>
-    <requirements>R-RM-1</requirements>
   </TestInfo>
 
   <RunInfo>
@@ -97,10 +96,7 @@
   </Models>
 
   <DataObjects>
-    <PointSet name="dummyIN">
-      <Input>x,y</Input>
-      <Output>OutputPlaceHolder</Output>
-    </PointSet>
+    <PointSet name="dummyIN"/>
     <PointSet name="optOut">
       <Input>x,y,func,const</Input>
       <Output>ans</Output>

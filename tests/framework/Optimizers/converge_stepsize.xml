@@ -27,13 +27,10 @@
       <Optimizer class="Optimizers" type="SPSA">opter</Optimizer>
       <SolutionExport class="DataObjects" type="PointSet">opt_export</SolutionExport>
       <Output class="DataObjects" type="PointSet">optOut</Output>
-      <Output class="OutStreams" type="Print">opt_export</Output>
     </MultiRun>
     <IOStep name="print">
       <Input class="DataObjects" type="PointSet">opt_export</Input>
-      <Input class="DataObjects" type="PointSet">optOut</Input>
       <Output class="OutStreams" type="Print">opt_export</Output>
-      <Output class="OutStreams" type="Print">optOut</Output>
     </IOStep>
   </Steps>
 
@@ -64,7 +61,7 @@
         <Strict/>
       </acceptance>
       <convergence>
-        <stepSize>1e-3</stepSize>
+        <stepSize>2e-3</stepSize>
       </convergence>
       <variable name="x">
         <distribution>beale_dist</distribution>
