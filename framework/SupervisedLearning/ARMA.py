@@ -245,31 +245,6 @@ class ARMA(supervisedLearning):
         self.raiseADebug('setting general Fourier settings for "{}"'.format(v))
         self.fourierParams[v] = sorted(basePeriods, reverse=True) # Must be largest to smallest!
 
-  def __getstate__(self):
-    """
-      Obtains state of object for pickling.
-      @ In, None
-      @ Out, d, dict, stateful dictionary
-    """
-    d = supervisedLearning.__getstate__(self)
-    eng=d.pop("randomEng")
-    randCounts = eng.get_rng_state()
-    d['crow_rng_counts'] = randCounts
-    return d
-
-  def __setstate__(self, d):
-    """
-      Sets state of object from pickling.
-      @ In, d, dict, stateful dictionary
-      @ Out, None
-    """
-    rngCounts = d.pop('crow_rng_counts')
-    self.__dict__.update(d)
-    self.setEngine(randomUtils.newRNG(), seed=None, count=rngCounts)
-    if self.reseedCopies:
-      randd = np.random.randint(1, 2e9)
-      self.reseed(randd)
-
   def setMulticycleParams(self, node):
     """
       Sets multicycle parameters in an object-oriented sense
@@ -1967,11 +1942,10 @@ class ARMA(supervisedLearning):
       Call this before training the subspace segment ROMs
       Note this is called on the LOCAL subsegment ROMs, NOT on the GLOBAL templateROM from the ROMcollection!
       @ In, settings, object, arbitrary information about ROM clustering settings from getGlobalRomSegmentSettings
+      @ In, picker, slice, selector to select subset of signal for this segment
       @ Out, None
     """
     if self.zeroFilterTarget:
-      print('DEBUGG adj local rom seg, zerofiltering!', self.zeroFilterTarget)
-      print(' ... ZF:', self._masks[self.zeroFilterTarget]['zeroFilterMask'][picker].sum())
       # FIXME is self._masks really correct? Did that copy down from the templateROM?
       self._masks[self.zeroFilterTarget]['zeroFilterMask'] = self._masks[self.zeroFilterTarget]['zeroFilterMask'][picker]
       self._masks[self.zeroFilterTarget]['notZeroFilterMask'] = self._masks[self.zeroFilterTarget]['notZeroFilterMask'][picker]

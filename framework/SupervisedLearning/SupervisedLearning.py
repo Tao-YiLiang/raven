@@ -431,6 +431,15 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
     # TODO can we do a generic basic statistics clustering on mean, std for all roms?
     self.raiseAnError(NotImplementedError, 'Clustering capabilities not yet implemented for "{}" ROM!'.format(self.__class__.__name__))
 
+  def setLocalRomClusterFeatures(self, settings: dict) -> None:
+    """
+      Forcibly set the parameters of this ROM based on those in "settings".
+      Settings will have naming conventions as from getLocalRomClusterFeatures.
+      TODO rename this get/set pair to something easy like setTrainedParams
+      @ In, settings, dict, parameters to set
+    """
+    self.raiseAnError(NotImplementedError, f'Clustering capabilities not yet implemented for "{self.__class__.__name__}" ROM!')
+
   def getGlobalRomSegmentSettings(self, trainingDict, divisions):
     """
       Allows the ROM to perform some analysis before segmenting.
@@ -443,12 +452,13 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
     # by default, do nothing
     return None, trainingDict
 
-  def adjustLocalRomSegment(self, settings):
+  def adjustLocalRomSegment(self, settings, picker):
     """
       Adjusts this ROM to account for it being a segment as a part of a larger ROM collection.
       Call this before training the subspace segment ROMs
       Note this is called on the LOCAL subsegment ROMs, NOT on the GLOBAL templateROM from the ROMcollection!
       @ In, settings, dict, as from getGlobalRomSegmentSettings
+      @ In, picker, slice, selector to select subset of signal for this segment
       @ Out, None
     """
     # by default, do nothing
@@ -474,6 +484,7 @@ class supervisedLearning(utils.metaclass_insert(abc.ABCMeta),MessageHandler.Mess
       @ Out, evaluation, dict, {target: np.ndarray} adjusted global evaluation
     """
     return evaluation
+
   ### END ROM Clustering ###
 
   @abc.abstractmethod

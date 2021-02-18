@@ -29,6 +29,7 @@ import abc
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+from scipy.stats import gaussian_kde
 # internal libraries
 from utils import utils, mathUtils, xmlUtils, randomUtils
 from .SupervisedLearning import supervisedLearning
@@ -728,7 +729,7 @@ class Clusters(Segments):
         if self._evaluationChoice == 'first':
           clusterIndex = 0
         else:
-          clusterIndex = list(self._clusterInfo['map'][r]).index(rom)
+          clusterIndex = list(self._clusterInfo['map'][r]).index(rom) # XXX FIXME map is gone
         # find ROM in full history
         segmentIndex, _ = self._getSegmentIndexFromClusterIndex(r, self._clusterInfo['labels'], clusterIndex=clusterIndex)
         # make local modifications based on global settings
@@ -762,26 +763,31 @@ class Clusters(Segments):
       @ Out, None
     """
     rlz = self._writeSegmentsRealization(writeTo)
-    # modify the segment entries to have the correct length
-    ## this is because segmenting doesn't throw out excess bits, but clustering sure does
-    correctLength = len(self._clusterInfo['labels'])
-    for key, value in rlz.items():
-      rlz[key] = value[:correctLength]
-    # add some cluster stuff
-    # cluster features
-    ## both scaled and unscaled
-    labels = self._clusterInfo['labels']
-    featureNames = sorted(list(self._clusterInfo['features']['unscaled'].keys()))
-    for scaling in ['unscaled', 'scaled']:
-      for name in featureNames:
-        varName = 'ClusterFeature|{}|{}'.format(name, scaling)
-        writeTo.addVariable(varName, np.array([]), classify='meta', indices=['segment_number'])
-        rlz[varName] = np.asarray(self._clusterInfo['features'][scaling][name])
-    varName = 'ClusterLabels'
-    writeTo.addVariable(varName, np.array([]), classify='meta', indices=['segment_number'])
-    rlz[varName] = np.asarray(labels)
+    # TODO
 
-    writeTo.addRealization(rlz)
+    ##### OLD #####
+    # # modify the segment entries to have the correct length
+    # ## this is because segmenting doesn't throw out excess bits, but clustering sure does
+    # correctLength = len(self._clusterInfo['labels'])
+    # for key, value in rlz.items():
+    #   rlz[key] = value[:correctLength]
+    # # add some cluster stuff
+    # # cluster features
+    # ## both scaled and unscaled
+    # labels = self._clusterInfo['labels']
+    # featureNames = self._clusterInfo['features']
+    # for feature in featureNames:
+    #   writeTo.addVariable(feature, np.array([]), classify='meta', indices)
+    # for scaling in ['unscaled', 'scaled']:
+    #   for name in featureNames:
+    #     varName = 'ClusterFeature|{}|{}'.format(name, scaling)
+    #     writeTo.addVariable(varName, np.array([]), classify='meta', indices=['segment_number'])
+    #     rlz[varName] = np.asarray(self._clusterInfo['features'][scaling][name])
+    # varName = 'ClusterLabels'
+    # writeTo.addVariable(varName, np.array([]), classify='meta', indices=['segment_number'])
+    # rlz[varName] = np.asarray(labels)
+
+    # writeTo.addRealization(rlz)
 
   def writeXML(self, writeTo, targets=None, skip=None):
     """
@@ -835,6 +841,33 @@ class Clusters(Segments):
     ## NOTE that it currently CANNOT be the QDataMining object, as that cannot be pickled!
     # update classifier features
     classifier.updateFeatures(features)
+    ##### START DEBUG #####
+    # The clustering is really not very good for the SyntheticHistory integration test.
+    # This may be partially due to the Fourier sine-cosine approach instead of amp/phase
+    # -> However, phase is circular/periodic, which makes clustering and resampling hard!
+    # There's also a challenge when every signal has the same property, but our normalization
+    #   explodes this through normalization to look like important differences.
+    print('DEBUGG cluster data:')
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    mn = mx = 0
+    cmap = {0: 'r', 1: 'r', 9: 'r',
+            2: 'c', 3: 'c', 6: 'c', 8: 'c',
+            4: 'g', 5: 'g', 7: 'g'
+           }
+    for f, (feature, vals) in enumerate(clusterFeatures.items()):
+      print(' ', feature, vals)
+      mn = min(min(vals), mn)
+      mx = max(max(vals), mx)
+      for v, val in enumerate(vals):
+        ax.text(val, f, f'{v}', ha='center', va='center', color=cmap[v])
+    ax.set_xlim(mn, mx)
+    ax.set_xlabel('Values')
+    ax.set_ylabel('Feature')
+    ax.set_yticks(range(len(features)))
+    ax.set_yticklabels(features)
+    plt.show()
+    ##### END DEBUG #####
     ## version for the unSupervisedLearning object
     classifier.train(clusterFeatures)
     labels = classifier.evaluate(clusterFeatures)
@@ -861,18 +894,28 @@ class Clusters(Segments):
     labelMap = self._clusterInfo['labels']
     clusters = sorted(list(set(labelMap)))
     pivotLen = 0
+    exampleROM = self._roms[0]
     for cluster in clusters:
-      # choose a ROM
-      # TODO implement a distribution-based method for representative ROMs
-      if self._evaluationChoice == 'first':
-        ## option 1: just take the first one
-        rom = self._roms[cluster]
-      elif self._evaluationChoice == 'random':
-        ## option 2: choose randomly
-        segmentIndex, clusterIndex = self._getSegmentIndexFromClusterIndex(cluster, labelMap, chooseRandom=True)
-        rom = self._clusterInfo['map'][cluster][clusterIndex]
+      # set up a ROM
+      ## sample characterstics of cluster
+      paramList = self._clusterInfo['features']
+      kde = self._clusterInfo['kdes'][cluster]
+      paramValues = kde.resample(size=1) # FIXME scipy >1.6, then we can pass a seed too
+      params = dict((paramList[i], value) for i, value in enumerate(paramValues))
+      exampleROM.setLocalRomClusterFeatures(params)
+      fixme; working
+      ##### OLD #####
+      # # TODO implement a distribution-based method for representative ROMs
+      # if self._evaluationChoice == 'first':
+      #   ## option 1: just take the first one
+      #   rom = self._roms[cluster]
+      # elif self._evaluationChoice == 'random':
+      #   ## option 2: choose randomly
+      #   segmentIndex, clusterIndex = self._getSegmentIndexFromClusterIndex(cluster, labelMap, chooseRandom=True)
+      #   rom = self._clusterInfo['map'][cluster][clusterIndex]
+      ##### END OLD #####
       # evaluate the ROM
-      subResults = rom.evaluate(evaluationDict)
+      subResults = exampleROM.evaluate(evaluationDict)
       # collect results
       newLen = len(subResults[pivotID])
       pivotLen += newLen
@@ -1042,6 +1085,7 @@ class Clusters(Segments):
 
       for feature, val in romData.items():
         clusterFeatures[feature].append(val)
+    # TODO FIXME check consistency of feature set, or clustering might not do what you think it does
     return clusterFeatures
 
   def _getSequentialRoms(self):
@@ -1075,7 +1119,7 @@ class Clusters(Segments):
     else:
       unclusteredROMs = []
     ## unclustered
-    self._clusterInfo['map']['unclustered'] = unclusteredROMs
+    # self._clusterInfo['map']['unclustered'] = unclusteredROMs
 
   def _clusterSegments(self, roms, divisions):
     """
@@ -1090,7 +1134,8 @@ class Clusters(Segments):
     # future: requested metrics
     ## TODO someday
     # store clustering info, unweighted
-    self._clusterInfo['features'] = {'unscaled': copy.deepcopy(clusterFeatures)}
+    unscaled = copy.deepcopy(clusterFeatures)
+    # OLD self._clusterInfo['features'] = {'unscaled': }
     # weight and scale data
     ## create hierarchy for cluster params
     features = sorted(clusterFeatures.keys())
@@ -1102,25 +1147,29 @@ class Clusters(Segments):
         hierarchFeatures[metric].append(ident)
     ## weighting strategy, TODO make optional for the user
     weightingStrategy = 'uniform'
-    clusterFeatures = self._weightAndScaleClusters(features, hierarchFeatures, clusterFeatures, weightingStrategy)
-    self._clusterInfo['features']['scaled'] = copy.deepcopy(clusterFeatures)
+    # NOTE replacing clusterFeatures with scaled cluster
+    scaledFeatures = self._weightAndScaleClusters(features, hierarchFeatures, clusterFeatures, weightingStrategy)
     # perform clustering
-    labels = self._classifyROMs(self._divisionClassifier, features, clusterFeatures)
+    labels = self._classifyROMs(self._divisionClassifier, features, scaledFeatures)
     uniqueLabels = sorted(list(set(labels))) # note: keep these ordered! Many things hinge on this.
     self.raiseAMessage('Identified {} clusters while training clustered ROM "{}".'.format(len(uniqueLabels), self._romName))
     # make cluster information dict
-    self._clusterInfo['labels'] = labels
-    ## clustered
-    if self._evaluationChoice == 'first':
-      # save memory!
-      romMapping = dict((label, roms[labels == label]) for label in uniqueLabels)
-      allIndices = np.arange(0, len(roms))
-      self._clusterInfo['map'] = dict((label, allIndices[labels == label]) for label in uniqueLabels)
-      self._roms = list(romMapping[label][0] for label in uniqueLabels)
-    elif self._evaluationChoice == 'random':
-      # save options!
-      self._clusterInfo['map'] = dict((label, roms[labels==label]) for label in uniqueLabels)
-      self._roms = list(self._clusterInfo['map'][label][0] for label in uniqueLabels)
+    # OLD self._clusterInfo['labels'] = labels
+    self._clusterInfo = self._makeClusterDistributions(unscaled, labels)
+    self._roms = [roms[0]] # TODO does it matter? we just need an example one to pass sampled characteristics to
+    # NOTE This might be a property of only the SyntheticHistory/ARMA ROMs; however,
+    # right now any clusterable ROM needs to have a "setCharacteristics" method that does not
+    # require a retraining of the ROM (i.e. functional not stateful), so this should be okay...?
+
+    #### OLD ####
+    # ## clustered
+    # if self._evaluationChoice == 'first':
+    #   # save memory!
+    #   self._roms = list(romMapping[label][0] for label in uniqueLabels)
+    # elif self._evaluationChoice == 'random':
+    #   # save options!
+    #   self._clusterInfo['map'] = dict((label, roms[labels==label]) for label in uniqueLabels)
+    #   self._roms = list(self._clusterInfo['map'][label][0] for label in uniqueLabels)
 
   def _weightAndScaleClusters(self, features, featureGroups, clusterFeatures, weightingStrategy):
     """
@@ -1185,6 +1234,43 @@ class Clusters(Segments):
     pivotEdges[-1] = pivotVals[pivotIndex if pivotIndex < len(pivotVals) else -1]
     return indexEdges[:-1], indexEdges[1:], pivotEdges[:-1], pivotEdges[1:]
 
+  def _makeClusterDistributions(self, features: dict, labels: list) -> dict:
+    """
+      Create distributions out of the cluster feature information.
+      @ In, features, dict, mapping of features to the value of that feature from each ROM
+      @ In, labels, list, list of labels in order of each ROM
+      @ Out, distros, dict, distribuion information
+    """
+    uniqueLabels = sorted(list(set(labels)))
+    # map of labels to which roms belong in those labels (actual ROM objects)
+    romIndices = np.arange(0, len(labels))
+    # map of labels to which rom_indices belong in those labels (just indices, not ROM objects)
+    romIndexMap = dict((label, list(romIndices[labels == label])) for label in uniqueLabels)
+    # collect all the samples belonging to each cluster
+    # -> data should be formed with dims (features, roms) for roms belonging to that cluster
+    data = dict((l, np.zeros((len(features), len(romIndexMap[l])))) for l in uniqueLabels)
+    bounds = dict((l, {}) for l in uniqueLabels)
+    for f, (feature, values) in enumerate(features.items()):
+      for v, value in enumerate(values): # "v" is also the rom index
+        label = labels[v]
+        romDataIndex = romIndexMap[label].index(v)
+        data[label][f, romDataIndex] = value
+    for label, ldata in data.items():
+      for f, feature in enumerate(features):
+        values = ldata[f, :]
+        bounds[label][feature] = {'min': values.min(),
+                                  'max': values.max(),
+                                  'mean': values.mean(),
+                                  'stdv': values.std()}
+    # train kernel density estimators for sampling each cluster
+    # these are sampled as distros['kernals'][cluster label].resample(size=1)
+    # in future versions of scipy, can provide "seed=42" as well
+    distros = {'kdes': dict((l, gaussian_kde(data[l])) for l in uniqueLabels),
+               'bounds': bounds,
+               'features': list(features.keys()),
+               'romIndexMap': romIndexMap,
+               'labels': labels}
+    return distros
 
 
 

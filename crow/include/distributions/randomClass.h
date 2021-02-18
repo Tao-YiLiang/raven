@@ -27,15 +27,15 @@ class RandomClass {
   RandomClassImpl *_rng;
   const double _range;
   unsigned int _counter;
-  unsigned int _seed;
+  unsigned long int _seed;
 public:
   RandomClass();
   ~RandomClass();
   void seed(unsigned long int seed);
   double random();
-  int get_rng_state();
+  unsigned long int get_rng_state();
   void forward_seed(unsigned int counts);
-  int get_rng_seed();
+  unsigned long int get_rng_seed();
 };
 
 #endif /* RANDOMCLASS_H */

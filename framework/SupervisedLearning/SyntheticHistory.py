@@ -18,9 +18,10 @@
   Originally from ARMA.py, split for modularity
   Uses TimeSeriesAnalysis (TSA) algorithms to train then generate synthetic histories
 """
+import collections
 import numpy as np
 
-from utils import InputData, xmlUtils
+from utils import InputData, xmlUtils, mathUtils
 import TSA
 
 from .SupervisedLearning import supervisedLearning
@@ -78,9 +79,12 @@ class SyntheticHistory(supervisedLearning):
       @ Out, None
     """
     self.pivotParameterID = inp.findFirst('pivotParameter').value # TODO does a base class do this?
+    tsaCounter = 0
     for sub in inp.subparts:
       if sub.name in TSA.knownTypes():
-        algo = TSA.returnInstance(sub.name, self.messageHandler)
+        tsaCounter += 1
+        cls = TSA.returnClass(sub.name, self.messageHandler)
+        algo = cls(name=f'{sub.name}{tsaCounter}') # TODO user names?
         self.algoSettings[algo] = algo.handleInput(sub)
         self.tsaAlgorithms.append(algo)
     if self.pivotParameterID not in self.target:
@@ -156,11 +160,28 @@ class SyntheticHistory(supervisedLearning):
     """
     root = writeTo.getRoot()
     for algo in self.tsaAlgorithms:
+      # only write trained information
+      if algo not in self.trainedParams:
+        continue
       algoNode = xmlUtils.newNode(algo.name)
       algo.writeXML(algoNode, self.trainedParams[algo])
       root.append(algoNode)
 
-  ### Segmenting and Clustering ###
+  ### Segmenting
+
+  def getGlobalRomSegmentSettings(self, trainingDict, divisions):
+    """
+      Allows the ROM to perform some analysis before segmenting.
+      Note this is called on the GLOBAL templateROM from the ROMcollection, NOT on the LOCAL subsegment ROMs!
+      @ In, trainingDict, dict, data for training, full and unsegmented
+      @ In, divisions, tuple, (division slice indices, unclustered spaces)
+      @ Out, settings, object, arbitrary information about ROM clustering settings
+      @ Out, trainingDict, dict, adjusted training data (possibly unchanged)
+    """
+    # nothing to do for now, but we'll hold this in case.
+    return super().getGlobalRomSegmentSettings(trainingDict, divisions)
+
+  ### Clustering
   def isClusterable(self):
     """
       Allows ROM to declare whether it has methods for clustring. Default is no.
@@ -168,7 +189,97 @@ class SyntheticHistory(supervisedLearning):
       @ Out, isClusterable, bool, if True then has clustering mechanics.
     """
     # clustering methods have been added
-    return False # TODO
+    return True
+
+  def checkRequestedClusterFeatures(self, request):
+    """
+      Takes the user-requested features (sometimes "all") and interprets them for this ROM.
+      @ In, request, dict(list), as from ROMColletion.Cluster._extrapolateRequestedClusterFeatures
+      @ Out, interpreted, dict(list), interpreted features
+    """
+    # if no specific request, cluster on everything
+    if request is None:
+      return self._getClusterableFeatures()
+    # if request given, iterate through and check them
+    errMsg = []
+    badAlgos = []    # keep a list of flagged bad algo names
+    badFeatures = collections.defaultdict(list) # keep a record of flagged bad features (but ok algos)
+    for algoName, feature in request.items():
+      if algoName not in badFeatures and algoName not in TSA.knownTypes():
+        errMsg.append(f'Unrecognized TSA algorithm while searching for cluster features: "{algoName}"! Expected one of: {TSA.knownTypes()}')
+        badAlgos.append(algoName)
+        continue
+      algo = TSA.returnClass(algoName, self)
+      if feature not in algo._features:
+        badFeatures[algoName].append(feature)
+    if badFeatures:
+      for algoName, features in badFeatures.items():
+        algo = TSA.returnClass(algoName, self)
+        errMsg.append(f'Unrecognized clusterable features for TSA algorithm "{algoName}": {features}. Acceptable features are: {algo._features}')
+    if errMsg:
+      self.raiseAnError(IOError, 'The following errors occured while building clusterable features:\n' +
+                        '\n  '.join(errMsg))
+    return request
+
+  def _getClusterableFeatures(self):
+    """
+      Provides a list of clusterable features.
+      For this ROM, these are as "TSA_algorith|feature" such as "fourier|amplitude"
+      @ In, None
+      @ Out, features, dict(list(str)), clusterable features by algorithm
+    """
+    features = {}
+    # check: is it possible tsaAlgorithms isn't populated by now?
+    for algo in self.tsaAlgorithms:
+      features[algo.name] = algo._features
+    return features
+
+  def getLocalRomClusterFeatures(self, featureTemplate, settings, request, picker=None):
+    """
+      Provides metrics aka features on which clustering compatibility can be measured.
+      This is called on LOCAL subsegment ROMs, not on the GLOBAL template ROM
+      @ In, featureTemplate, str, format for feature inclusion
+      @ In, settings, dict, as per getGlobalRomSegmentSettings
+      @ In, request, dict(list), requested features to cluster on (by feature set)
+      @ In, picker, slice, indexer for segmenting data
+      @ Out, features, dict, {target_metric: np.array(floats)} features to cluster on
+    """
+    features = {}
+    for algo in self.tsaAlgorithms:
+      if algo.name not in request:
+        continue
+      algoReq = request[algo.name] if request is not None else None
+      algoFeatures = algo.getClusteringValues(featureTemplate, algoReq, self.trainedParams[algo])
+      features.update(algoFeatures)
+    return features
+
+  def setLocalRomClusterFeatures(self, settings):
+    """
+      Forcibly set the parameters of this ROM based on those in "settings".
+      Settings will have naming conventions as from getLocalRomClusterFeatures.
+      @ In, settings, dict, parameters to set
+    """
+    byAlgo = collections.defaultdict(list)
+    for feature, values in settings.items():
+      target, algoName, ident = feature.split('|', maxsplit=2)
+      byAlgo[algoName].append((target, ident, values))
+    for algo in self.tsaAlgorithms:
+      settings = byAlgo.get(algo.name, None)
+      if settings:
+        params = algo.setClusteringValues(settings, self.trainedParams[algo])
+        self.trainedParams[algo] = params
+
+  def findAlgoByName(self, name):
+    """
+      Find the corresponding algorithm by name
+      @ In, name, str, name of algorithm
+      @ Out, algo, TSA.TimeSeriesAnalyzer, algorithm
+    """
+    for algo in self.tsaAlgorithms:
+      if algo.name == name:
+        return algo
+    return None
+
 
   ### ESSENTIALLY UNUSED ###
   def _localNormalizeData(self,values,names,feat):

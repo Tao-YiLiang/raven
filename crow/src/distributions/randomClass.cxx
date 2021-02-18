@@ -40,7 +40,7 @@ double RandomClass::random() {
     return (_rng->_backend()-_rng->_backend.min())/_range;
   }
 
-int RandomClass::get_rng_state() {
+unsigned long int RandomClass::get_rng_state() {
     return _counter;
 }
 
@@ -49,7 +49,7 @@ void RandomClass::forward_seed(unsigned int counts){
     _rng->_backend.discard(counts);
 }
 
-int RandomClass::get_rng_seed(){
+unsigned long int RandomClass::get_rng_seed(){
   return _seed;
 }
 
